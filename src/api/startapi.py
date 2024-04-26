@@ -208,6 +208,8 @@
 #     try:
 #         # 从请求URL中获取参数
 #         path = request.args.get('path', default='', type=str)  # 必须信息
+#         media_path = combine_directories('media')
+#         path = os.path.abspath(os.path.join(media_path, path))
 #
 #         if path == '':
 #             return jsonify({

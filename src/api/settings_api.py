@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body
-from src.api.response import ResponseEntity, response_decorator
+from src.api.response.response import ResponseEntity, response_decorator
 from src.core.tool import get_settings_json, update_settings_json
 
 router = APIRouter()
@@ -11,7 +11,7 @@ router = APIRouter()
 def api_settings():
     # 从请求URL中获取参数
     settings_json = get_settings_json()
-    return ResponseEntity(data=settings_json, message="获取设置信息成功。", statusCode="OK")
+    return ResponseEntity(data=settings_json, message="获取设置信息成功。")
 
 
 @router.post('/api/settings/update')

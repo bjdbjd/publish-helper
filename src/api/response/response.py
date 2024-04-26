@@ -1,10 +1,13 @@
 import datetime
+import json
 import traceback
 from functools import wraps
 
 from pydantic import BaseModel, Field
+from starlette.responses import JSONResponse
 
-from src.error.publish_helper_error import PublishHelperError
+from src.error.publish_helper_error import PublishHelperError, StatusCode
+from src.utils.enum_util import get_enum_by_value, get_enum_by_name
 
 
 def response_decorator(func):
@@ -16,12 +19,14 @@ def response_decorator(func):
             elapsed_time = datetime.datetime.now() - start_time
             response_entity.elapsed_time = elapsed_time.total_seconds()
             response_entity.version = "0.0.1"
+            response_entity.statusCode = StatusCode.OK.name
         except PublishHelperError as publish_helper_error:
             elapsed_time = datetime.datetime.now() - start_time
             response_entity = ResponseEntity(
                 message=publish_helper_error.message,
                 elapsed_time=elapsed_time.total_seconds(),
                 version="0.0.1",
+                statusCode=publish_helper_error.status_code.name
             )
             traceback.print_exc()
         except Exception as e:
@@ -30,10 +35,13 @@ def response_decorator(func):
                 message="未知错误",
                 elapsed_time=elapsed_time.total_seconds(),
                 version="0.0.1",
+                statusCode=StatusCode.SERVER_ERROR.name
             )
             traceback.print_exc()
-        return response_entity
-
+        # return response_entity
+        # 使用 JSONResponse 返回响应，并设置状态码
+        return JSONResponse(content=response_entity.dict(),
+                            status_code=get_enum_by_name(StatusCode, response_entity.statusCode).value)
     return wrapper
 
 
