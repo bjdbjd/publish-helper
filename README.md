@@ -86,6 +86,14 @@ pip install -r requirements.txt
 配置默认工作目录为项目根目录，随后运行对应按钮即可。
 ![img.png](docs/img/img.png)
 
+
+
+### API
+
+```
+启动后访问 0.0.0.0:5372/docs 查看API文档
+```
+
 ## 附件
 
 - [镜像发布](docs/docker_publish.md)
