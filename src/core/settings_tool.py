@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 # 导入兼容桥：扁平导入 (config.*/utils.*) 要求 src/ 在 sys.path 上。
-# _new 入口 (main_gui_new/main_api_new) 会插入 src/；旧入口 (main_gui/main_api,
-# PyInstaller 打包用) 不插。这里在缺省时手动把 src/ 补进 sys.path，保证两套入口都能工作。
+# 入口 (main_gui/main_api/main_cli) 已用 __file__ 自举把 src/ 加入 sys.path；
+# 但在某些直接 import 本模块的场景下 src/ 可能不在 path，这里缺省时手动补上，保证总是可解析。
 try:
     from config.settings import config
     from utils.exceptions import ConfigurationError

@@ -178,11 +178,7 @@ export PTGEN_API_KEY=your-key
 ### 2. 改进的启动方式
 
 ```bash
-# 新的启动方式（带完整日志）
-python src/main_gui_new.py
-python src/main_api_new.py
-
-# 原有方式依然有效
+# 启动方式（带完整日志）
 python src/main_gui.py
 python src/main_api.py
 ```

@@ -57,10 +57,10 @@ clean:
 
 # Running applications
 run-gui:
-	python src/main_gui_new.py
+	python src/main_gui.py
 
 run-api:
-	python src/main_api_new.py
+	python src/main_api.py
 
 # Docker
 docker-build:

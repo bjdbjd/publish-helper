@@ -98,13 +98,9 @@ fc-cache -f -v
 
 ```bash
 # GUI模式
-python src/main_gui_new.py
+python src/main_gui.py
 
 # API模式  
-python src/main_api_new.py
-
-# 原有方式依然支持
-python src/main_gui.py
 python src/main_api.py
 ```
 
@@ -208,8 +204,8 @@ publish-helper/
 │   ├── core/              # 核心功能
 │   ├── gui/               # GUI界面
 │   ├── api/               # API接口
-│   ├── main_gui_new.py    # GUI入口
-│   └── main_api_new.py    # API入口
+│   ├── main_gui.py        # GUI入口
+│   └── main_api.py        # API入口
 ├── tests/                 # 测试代码
 ├── docs/                  # 文档
 ├── requirements.txt       # 生产依赖

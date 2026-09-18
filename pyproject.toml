@@ -56,8 +56,8 @@ Issues = "https://github.com/bjdbjd/publish-helper/issues"
 Documentation = "https://github.com/bjdbjd/publish-helper/wiki"
 
 [project.scripts]
-publish-helper-gui = "src.main_gui_new:main"
-publish-helper-api = "src.main_api_new:main"
+publish-helper-gui = "src.main_gui:main"
+publish-helper-api = "src.main_api:main"
 
 [project.optional-dependencies]
 dev = [

@@ -10,8 +10,8 @@ publish-helper/
 │   ├── gui/               # GUI模块
 │   ├── config/            # 配置模块
 │   ├── utils/             # 工具模块
-│   ├── main_gui_new.py    # GUI入口点
-│   └── main_api_new.py    # API入口点
+│   ├── main_gui.py        # GUI入口点
+│   └── main_api.py        # API入口点
 ├── tests/                 # 测试代码
 ├── docs/                  # 文档
 ├── static/                # 静态资源

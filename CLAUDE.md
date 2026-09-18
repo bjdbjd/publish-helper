@@ -13,14 +13,14 @@ pip install -r requirements.txt      # production deps
 pip install -r requirements-dev.txt  # dev deps (returns a trailing pre-commit install line)
 ```
 
-Run the app (use the `_new` entries — the modern snake_case modules):
+Run the app:
 
 ```bash
-python src/main_gui_new.py           # PyQt6 GUI
-python src/main_api_new.py           # Flask API (default port 15372)
+python src/main_gui.py           # PyQt6 GUI
+python src/main_api.py           # Flask API (default port 15372)
 ```
 
-Legacy flat entries (`src/main_gui.py`, `src/main_api.py`) are kept for PyInstaller packaging and backward compatibility; prefer the `_new` versions for new work.
+Each entry is self-contained: it bootstraps `sys.path` from its own `__file__` (so it runs regardless of CWD), uses flat imports (`from config.settings import config`), and wraps startup in logging + exception handling (`PublishHelperError`/`KeyboardInterrupt`/`Exception`). The GUI entry also carries the PyInstaller packaging instructions.
 
 Tests / quality (also via `make test|lint|format|check-all`):
 
@@ -38,12 +38,13 @@ pre-commit install                          # installs configured git hooks
 
 ### Import style — read this before writing imports
 
-Two entry-point generations coexist and **both import styles resolve at runtime**, so don't be misled:
+Two import styles resolve at runtime (both work because the entry points bootstrap `sys.path`), so don't be misled:
 
-- The `_new` entries (`main_gui_new.py`, `main_api_new.py`) insert BOTH the project root and `src/` onto `sys.path`, so they write flat imports: `from config.settings import config`, `from gui.startgui import start_gui`.
+- The entry points (`src/main_gui.py`, `src/main_api.py`, `src/main_cli.py`) insert both the project root and `src/` onto `sys.path`, so they can write flat imports: `from config.settings import config`, `from gui.startgui import start_gui`.
 - The internal modules (`src/core/*`, `src/api/*`, `src/gui/*`) use the `src.`-prefixed style: `from src.core.rename import rename_file`.
+- Some utility modules (e.g. `src/core/settings_tool.py`, `src/utils/file_utils.py`) use flat imports guarded by an import-compat bridge that inserts `src/` onto `sys.path` if missing.
 
-When adding code inside a module under `src/`, follow the `from src.…` convention used by that module. Playwright the entry point you touch: there is no single canonical convention across the tree.
+When adding code inside a module under `src/`, follow the `from src.…` convention used by that module. Mirror the entry point you touch: there is no single canonical convention across the tree.
 
 ### Layering
 
