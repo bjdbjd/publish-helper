@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Tuple, Union
 from torf import Torrent
 from xpinyin import Pinyin
 
+from src.utils.file_utils import load_or_initialize_json
+
 # settings 系统单一实现：迁移到 settings_tool.settings_tool（带类型注解的 SettingsManager）。
 # 这里 re-export，使现有 `from src.core.tool import get_settings/...` 消费方零改动切换实现。
 # 注意删除了本文件旧的 get_settings/update_settings/get_settings_json/update_settings_json 实现。
@@ -97,26 +99,8 @@ def get_combo_box_data(data_name: str) -> Tuple[bool, list]:
                 ]
             }
 
-        # Check if the file exists
-        if not os.path.exists(file_path):
-            # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            # Write the default content to the file
-            with open(file_path, 'w', encoding='utf-8') as file:
-                json.dump(default_content, file, ensure_ascii=False, indent=4)
-
-        # Load content from the file
-        with open(file_path, 'r', encoding='utf-8') as file:
-            data = json.load(file)
-
-        # Check if the specified data_name key exists in the loaded data
-        if data_name not in data:
-            # Update data with default content if not present
-            data.update(default_content)
-            # Save updated data back to the file
-            with open(file_path, 'w', encoding='utf-8') as file:
-                json.dump(data, file, ensure_ascii=False, indent=4)
-
+        # Check if the file exists / load with defaults（缺失 key 自动补齐并写回）
+        data = load_or_initialize_json(file_path, default_content)
         return True, data[data_name]
 
     except Exception as e:
@@ -264,12 +248,12 @@ def find_picture_bed_type(picture_bed_api_url: str, picture_bed_api_data: dict) 
 def get_abbreviation(original_name: str, json_file_path: str = 'static/abbreviation.json') -> str:
     print('开始对参数名称进行转化')
     try:
-
         json_file_path = combine_directories('static/abbreviation.json')
 
-        # Check if the file exists; if not, create it with default data
-        if not os.path.exists(json_file_path):
-            default_data = {
+        # 文件不存在则以默认表创建；存在的 key 缺失时自动补齐并写回
+        abbreviation_map = load_or_initialize_json(
+            json_file_path,
+            {
                 'min_widths': MIN_WIDTHS,
                 '7 680 pixels': '4320p',
                 '3 840 pixels': '2160p',
@@ -311,14 +295,9 @@ def get_abbreviation(original_name: str, json_file_path: str = 'static/abbreviat
                 'L R C LFE Ls Rs': '5.1',
                 'C L R Ls Rs LFE': '5.1',
                 'L R': '2.0',
-                'Audio': 'Audio'
-            }
-            with open(json_file_path, 'w', encoding='utf-8') as file:
-                json.dump(default_data, file, ensure_ascii=False, indent=4)
-
-        # Open and load the abbreviation map
-        with open(json_file_path, 'r', encoding='utf-8') as file:
-            abbreviation_map = json.load(file)
+                'Audio': 'Audio',
+            },
+        )
 
         # Return the abbreviation if found, else return the original name
         return str(abbreviation_map.get(original_name, original_name))

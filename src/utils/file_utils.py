@@ -1,11 +1,19 @@
 """File and path utilities."""
 
 import hashlib
+import json
 import shutil
+import sys
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from utils.logger import get_logger
+# 导入兼容桥：扁平导入 (utils.*) 要求 src/ 在 sys.path 上。
+# _new 入口会插入 src/；旧入口 (main_gui/main_api, PyInstaller 用) 不插，这里缺省时手动补上。
+try:
+    from utils.logger import get_logger
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+    from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -80,7 +88,7 @@ def get_file_hash(file_path: Union[str, Path], algorithm: str = "md5") -> str:
         for chunk in iter(lambda: f.read(4096), b""):
             hash_func.update(chunk)
 
-    hash_value = hash_func.hexdigest()
+    hash_value: str = hash_func.hexdigest()
     logger.debug(f"Calculated {algorithm} hash for {path_obj}: {hash_value}")
     return hash_value
 
@@ -179,7 +187,7 @@ def find_files(
     if not dir_path.exists():
         raise FileNotFoundError(f"Directory not found: {dir_path}")
 
-    files = []
+    files: List[Path] = []
     for pattern in patterns:
         if recursive:
             files.extend(dir_path.rglob(pattern))
@@ -215,3 +223,50 @@ def get_file_size_human(size_bytes: int) -> str:
         size_index += 1
 
     return f"{size:.1f} {size_names[size_index]}"
+
+
+def load_or_initialize_json(
+    path: Union[str, Path], defaults: Dict[str, Any], ensure_ascii: bool = False
+) -> Dict[str, Any]:
+    """
+    Load a JSON file, initializing it with *defaults* when missing or unreadable.
+
+    收敛 tool.py 中重复 3 次的「文件不存在则写默认 → 读取 → 缺 key 补默认」模式：
+    - 文件不存在时以 *defaults* 创建，并返回 defaults 的副本；
+    - 文件存在但某些 *defaults* 里的 key 缺失时，补入并写回，然后返回合并结果；
+    - 文件损坏（JSON 解析失败）时抛出 ValueError，由调用方决定兜底。
+
+    Args:
+        path: JSON 文件路径
+        defaults: 需要保证存在（缺失时补入）的默认键值
+        ensure_ascii: 写文件时是否用 ASCII 转义（中文通常应为 False）
+
+    Returns:
+        加载（并可能已补齐默认值）后的 JSON 字典
+    """
+    path_obj = Path(path)
+
+    if not path_obj.exists():
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+        path_obj.write_text(
+            json.dumps(defaults, ensure_ascii=ensure_ascii, indent=4), encoding="utf-8"
+        )
+        return dict(defaults)
+
+    try:
+        data: Dict[str, Any] = json.loads(path_obj.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        raise ValueError(f"JSON 解析失败，文件可能损坏: {path_obj}")
+
+    changed = False
+    for key, value in defaults.items():
+        if key not in data:
+            data[key] = value
+            changed = True
+
+    if changed:
+        path_obj.write_text(
+            json.dumps(data, ensure_ascii=ensure_ascii, indent=4), encoding="utf-8"
+        )
+
+    return data

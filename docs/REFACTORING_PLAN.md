@@ -121,11 +121,11 @@ return send_file(str(target_path), as_attachment=True)
 **2.2** 类型注解：`tool.py` 28 函数、`rename.py` 10 函数。优先高价值：`check_path_and_find_video`、`get_data_from_pt_gen_description`、`get_pt_gen_info`、`get_name_from_template`（16 参）、`make_torrent`、`create_hard_link`。**本轮不引入 Enum**（改 25+ 调用点，属「拆分巨型」阶段）。
 **2.3 验证**：`mypy src/core/` 无 `disallow_untyped_defs` 报错；`pytest tests/ -q` 通过。
 
-### 阶段 3：抽公共常量 + 去重（3.1 ✅ / 3.2 ✅ 已合并；3.3 ⬜ 待做）
+### 阶段 3：抽公共常量 + 去重（✅ 全部完成 → d1b8649 / 38bf189 / 阶段3提交）
 
-**3.1** ✅ `video_extensions`（tool.py 503、662 两处）→ 模块级 `VIDEO_EXTENSIONS`（见阶段 2.2 提交）。
-**3.2** ✅ 分辨率表 → 收敛到 `tool.MIN_WIDTHS` 常量，`get_abbreviation` 与 `load_min_widths_from_json` 共用（见阶段 3 提交）。
-**3.3** ⬜ JSON 初始化模式（`get_settings`/`get_combo_box_data`/`get_abbreviation` 重复 3 次）→ 抽 `load_or_initialize_json(path, defaults)` 放 `utils/file_utils.py`。
+**3.1** ✅ `video_extensions` → 模块级 `VIDEO_EXTENSIONS`。
+**3.2** ✅ 分辨率表 → 收敛到 `tool.MIN_WIDTHS` 常量，两处共用。
+**3.3** ✅ 抽 `load_or_initialize_json` helper 放 `utils/file_utils.py`，重构 `get_combo_box_data`/`get_abbreviation` 复用（`get_picture_bed_type` 的 URL-合并逻辑更复杂，保留原样避免行为风险）。
 
 ### 阶段 4：`/api/getFile` 鉴权加固（✅ 已完成 → 54eab95）
 
