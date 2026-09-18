@@ -1,9 +1,11 @@
 import os
 from dataclasses import dataclass, asdict
+from pathlib import Path
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
+from src.config.settings import config
 from src.core.mediainfo import get_media_info
 from src.core.picturebed import upload_picture
 from src.core.ptgen import get_pt_gen_description
@@ -1652,20 +1654,23 @@ def api_get_file():
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
             }), 422
 
-        # 先构建绝对路径，再进行校验防止越权
-        temp_path = combine_directories('temp')
-        target_path = os.path.abspath(file_path)
+        # 先构建绝对路径，再进行校验防止越权。
+        # 基准用 config.TEMP_DIR（项目根 temp/），而不用 cwd —— 服务以不同 cwd 启动时基准不漂移。
+        # Path.resolve() 会解析符号链接与 '..'，杜绝指尖逃逸；parents 成员判断是路径分隔符边界的
+        # 成员判断，天然杜绝 'temp_evil/...' 这类字符串前缀绕过。
+        temp_root = Path(config.TEMP_DIR).resolve()
+        target_path = Path(file_path).resolve()
 
-        # 确认绝对路径为temp目录即可
-        if not target_path.startswith(temp_path):
+        # temp_root 本身不可作为文件访问目标；必须严格位于 temp_root 之下
+        if temp_root not in target_path.parents:
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
                 'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
             }), 401
 
-        # 检查文件是否存在
-        if not os.path.exists(target_path):
+        # 检查文件是否存在（且是普通文件，防止返回目录内容）
+        if not target_path.is_file():
             print(target_path)
             return jsonify({
                 'data': {},
@@ -1674,7 +1679,7 @@ def api_get_file():
             }), 404
 
         # 返回文件
-        return send_file(target_path, as_attachment=True)
+        return send_file(str(target_path), as_attachment=True)
     except Exception as e:
         return jsonify({
             'data': {},
