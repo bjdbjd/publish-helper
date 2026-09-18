@@ -247,6 +247,10 @@ class Ui_Settings(object):
         self.deleteScreenshot.setChecked(True)
         self.deleteScreenshot.setObjectName("deleteScreenshot")
         self.horizontalLayout_9.addWidget(self.deleteScreenshot)
+        self.autoDownloadUploadPoster = QtWidgets.QCheckBox(parent=self.tab)
+        self.autoDownloadUploadPoster.setChecked(False)
+        self.autoDownloadUploadPoster.setObjectName("autoDownloadUploadPoster")
+        self.horizontalLayout_9.addWidget(self.autoDownloadUploadPoster)
         self.mediaInfoSuffix = QtWidgets.QCheckBox(parent=self.tab)
         self.mediaInfoSuffix.setChecked(True)
         self.mediaInfoSuffix.setObjectName("mediaInfoSuffix")
@@ -1210,6 +1214,30 @@ class Ui_Settings(object):
 "}\n"
 ""))
         self.deleteScreenshot.setText(_translate("Settings", "上传后删除本地图片"))
+        self.autoDownloadUploadPoster.setStyleSheet(_translate("Settings", "QPushButton {\n"
+"    display: inline-block;\n"
+"    padding: 5px 5px;\n"
+"    font-size: 16px;\n"
+"    cursor: pointer;\n"
+"    text-align: center;\n"
+"    text-decoration: none;\n"
+"    outline: none;\n"
+"    color:#fff;\n"
+"    background-color: #559e24;\n"
+"    border: none;\n"
+"    border-radius: 15px;\n"
+"    box-shadow: 0 9px #999;\n"
+"}\n"
+"\n"
+"QPushButton:hover {\n"
+"background-color: #4a8821;\n"
+"}\n"
+"\n"
+"QPushButton:pressed {\n"
+"    background-color: #3c6f1b;\n"
+"}\n"
+""))
+        self.autoDownloadUploadPoster.setText(_translate("Settings", "自动下载并上传海报"))
         self.mediaInfoSuffix.setStyleSheet(_translate("Settings", "QPushButton {\n"
 "    display: inline-block;\n"
 "    padding: 5px 5px;\n"

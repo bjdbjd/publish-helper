@@ -659,9 +659,40 @@ def api_get_pt_gen_description():
 
         get_pt_gen_description_success, response = get_pt_gen_description(pt_gen_api_url, resource_url)
         if get_pt_gen_description_success:
+            # response is now (format_data, full_data)
+            format_data, full_data = response
+            
+            # Check if auto download and upload poster is enabled
+            auto_download_upload_poster = bool(get_settings('auto_download_upload_poster'))
+            poster_url = ''
+            
+            if auto_download_upload_poster:
+                try:
+                    from src.core.poster import get_poster_from_pt_gen_response
+                    
+                    picture_bed_api_url = get_settings('picture_bed_api_url')
+                    picture_bed_api_token = get_settings('picture_bed_api_token')
+                    screenshot_storage_path = combine_directories(get_settings('screenshot_storage_path'))
+                    
+                    process_success, process_result = get_poster_from_pt_gen_response(
+                        full_data,
+                        picture_bed_api_url,
+                        picture_bed_api_token,
+                        screenshot_storage_path
+                    )
+                    
+                    if process_success:
+                        poster_url = process_result
+                        print(f'Poster uploaded successfully: {poster_url}')
+                    else:
+                        print(f'Poster processing failed: {process_result}')
+                except Exception as e:
+                    print(f'Error processing poster: {e}')
+            
             return jsonify({
                 'data': {
-                    'description': response
+                    'description': format_data,
+                    'posterUrl': poster_url
                 },
                 'message': '获取PT-Gen简介成功。',
                 'statusCode': 'OK'
@@ -742,7 +773,7 @@ def api_get_pt_gen_info():
                 'statusCode': '缺少PT-Gen简介内容。'
             }), 422
 
-        original_title, english_title, year, other_names_sorted, category, actors_list = get_pt_gen_info(
+        original_title, english_title, year, other_names_sorted, category, actors_list, episodes, season = get_pt_gen_info(
             description)
         print(original_title, english_title, year, other_names_sorted, category, actors_list)
         actors = ''
@@ -1716,8 +1747,10 @@ def api_get_pt_gen_info_by_url():
 
         get_pt_gen_description_success, response = get_pt_gen_description(pt_gen_api_url, resource_url)
         if get_pt_gen_description_success:
-            original_title, english_title, year, other_names_sorted, category, actors_list = get_pt_gen_info(
-                response)
+            # response is now (format_data, full_data)
+            format_data, full_data = response
+            original_title, english_title, year, other_names_sorted, category, actors_list, episodes, season = get_pt_gen_info(
+                format_data, raw_data=full_data)
             actors = ''
             other_titles = ''
             is_first = True
@@ -2017,8 +2050,10 @@ def api_auto_handle_movie():
             if not get_pt_gen_description_success:
                 raise RuntimeError(f'获取PT-Gen简介失败：{response}')
 
-        # print(f'获取到pt_gen响应：{response}')
-        data_instance.description = response
+        # response is now (format_data, full_data)
+        format_data, full_data = response
+        # print(f'获取到pt_gen响应：{format_data}')
+        data_instance.description = format_data
 
         # 获取截图
         if screenshot_number >= 0:
@@ -2147,7 +2182,7 @@ def api_auto_handle_movie():
 
         # 获取PT-GenInfo
         print(f'获取PT-GenInfo，从{data_instance.description}')
-        original_title, english_title, year, other_names_sorted, categories, actors_list, episodes = get_pt_gen_info(
+        original_title, english_title, year, other_names_sorted, categories, actors_list, episodes, season = get_pt_gen_info(
             data_instance.description)
         print(original_title, english_title, year, other_names_sorted, categories, actors_list)
         actors = ''

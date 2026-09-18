@@ -48,27 +48,65 @@ def lsky_pro_picture_bed(api_url, api_token, frame_path):
     data = {}
     print('值已经获取')
 
+    # Debug: print request details
+    print(f'[DEBUG] Request URL: {url}')
+    print(f'[DEBUG] Headers: {headers}')
+    print(f'[DEBUG] File path: {frame_path}')
+    print(f'[DEBUG] File size: {os.path.getsize(frame_path)} bytes')
+
     try:
         # 发送POST请求
         print('开始发送上传图床的请求')
         res = requests.post(url, headers=headers, data=data, files=files)
         print('已成功发送上传图床的请求')
+        print(f'响应状态码：{res.status_code}')
+        print(f'[DEBUG] Response headers: {dict(res.headers)}')
+        print(f'响应内容：{res.text[:500] if res.text else "(empty)"}')  # Print first 500 chars to avoid overwhelming output
     except requests.RequestException as e:
         print(f'请求过程中出现错误：{str(e)}')
         return False, f'请求过程中出现错误：{str(e)}'
 
+    # Check HTTP status code first
+    if res.status_code != 200:
+        print(f'图床API返回非200状态码：{res.status_code}')
+        return False, f'图床API返回错误状态码：{res.status_code}，响应内容：{res.text}'
+
     try:
         data = json.loads(res.text)
+        # 检查data是否为None或不包含预期的结构
+        if data is None:
+            print(f'图床API返回了空数据，响应文本：{res.text}')
+            return False, f'图床API返回了空数据，响应文本：{res.text}'
+        
+        # Check if the API returned an error in the response
+        if 'status' in data and data['status'] is False:
+            error_msg = data.get('message', '未知错误')
+            print(f'图床API返回错误：{error_msg}')
+            return False, f'图床API返回错误：{error_msg}'
+        
+        # Validate nested structure exists
+        if 'data' not in data or data['data'] is None:
+            print(f'图床API响应缺少data字段，完整响应：{res.text}')
+            return False, f'图床API响应格式错误：缺少data字段'
+        
+        if 'links' not in data['data'] or data['data']['links'] is None:
+            print(f'图床API响应缺少links字段，data内容：{data.get("data")}')
+            return False, f'图床API响应格式错误：缺少links字段'
+        
+        if 'bbcode' not in data['data']['links']:
+            print(f'图床API响应缺少bbcode字段，links内容：{data["data"]["links"]}')
+            return False, f'图床API响应格式错误：缺少bbcode字段'
+        
         # 提取所需的URL
         image_bbs_url = data['data']['links']['bbcode']
         print(image_bbs_url)
         return True, image_bbs_url
     except KeyError as e:
-        print(f'图床响应结果缺少所需的值：{str(e)}，{str(res)}')
-        return False, f'图床响应结果缺少所需的值：{str(e)}，{str(res)}'
+        print(f'图床响应结果缺少所需的值：{str(e)}，响应内容：{res.text}')
+        return False, f'图床响应结果缺少所需的值：{str(e)}，响应内容：{res.text}'
     except json.JSONDecodeError as e:
-        print(f'处理返回的JSON过程中出现错误：{str(e)}，{str(res)}')
-        return False, f'处理返回的JSON过程中出现错误：{str(e)}，{str(res)}'
+        print(f'处理返回的JSON过程中出现错误：{str(e)}，响应文本：{res.text}')
+        return False, f'处理返回的JSON过程中出现错误：{str(e)}，响应文本：{res.text}'
 
 
 # 薄荷图床

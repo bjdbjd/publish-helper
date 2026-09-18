@@ -56,6 +56,7 @@ class SettingsManager:
             "auto_upload_screenshot": "True",
             "paste_screenshot_url": "True",
             "delete_screenshot": "True",
+            "auto_download_upload_poster": "False",
             # Thumbnail settings
             "do_get_thumbnail": "True",
             "thumbnail_rows": "3",
