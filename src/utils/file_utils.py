@@ -226,26 +226,33 @@ def get_file_size_human(size_bytes: int) -> str:
 
 
 def load_or_initialize_json(
-    path: Union[str, Path], defaults: Dict[str, Any], ensure_ascii: bool = False
+    path: Union[str, Path],
+    defaults: Dict[str, Any],
+    ensure_ascii: bool = False,
+    backfill: bool = False,
 ) -> Dict[str, Any]:
     """
-    Load a JSON file, initializing it with *defaults* when missing or unreadable.
+    Load a JSON file, initializing it with *defaults* when missing.
 
-    收敛 tool.py 中重复 3 次的「文件不存在则写默认 → 读取 → 缺 key 补默认」模式：
+    收敛 tool.py 中重复的「文件不存在则以默认创建 → 读取 → （可选）缺 key 补默认」模式：
     - 文件不存在时以 *defaults* 创建，并返回 defaults 的副本；
-    - 文件存在但某些 *defaults* 里的 key 缺失时，补入并写回，然后返回合并结果；
+    - 文件存在时：
+      * backfill=False（默认）：直接读取返回，绝不改写已有文件（对应原 get_abbreviation 语义）；
+      * backfill=True：缺失的默认 key 补入并写回（对应原 get_combo_box_data 语义，保留原缩进）；
     - 文件损坏（JSON 解析失败）时抛出 ValueError，由调用方决定兜底。
 
     Args:
         path: JSON 文件路径
-        defaults: 需要保证存在（缺失时补入）的默认键值
+        defaults: 需要保证存在（创建时写入 / backfill 时补入）的默认键值
         ensure_ascii: 写文件时是否用 ASCII 转义（中文通常应为 False）
+        backfill: 已存在文件是否补齐缺失默认键并写回（默认 False，只读）
 
     Returns:
-        加载（并可能已补齐默认值）后的 JSON 字典
+        加载（新建或补齐后）的 JSON 字典
     """
     path_obj = Path(path)
 
+    # 文件不存在：以 defaults 创建（新建时用 indent=4）
     if not path_obj.exists():
         path_obj.parent.mkdir(parents=True, exist_ok=True)
         path_obj.write_text(
@@ -253,20 +260,31 @@ def load_or_initialize_json(
         )
         return dict(defaults)
 
+    # 文件已存在：读取（backfill=False 时绝不改写；True 时仅在补缺失键时保留原缩进写回）
     try:
-        data: Dict[str, Any] = json.loads(path_obj.read_text(encoding="utf-8"))
+        raw = path_obj.read_text(encoding="utf-8")
+        data: Dict[str, Any] = json.loads(raw)
     except json.JSONDecodeError:
         raise ValueError(f"JSON 解析失败，文件可能损坏: {path_obj}")
 
     changed = False
-    for key, value in defaults.items():
-        if key not in data:
-            data[key] = value
-            changed = True
+    if backfill:
+        for key, value in defaults.items():
+            if key not in data:
+                data[key] = value
+                changed = True
 
-    if changed:
+    if backfill and changed:
+        # 尽量沿用文件原有缩进；无法探测（无前导空格）时退回 4 空格
+        first_indent = ""
+        for line in raw.splitlines():
+            stripped = line.lstrip(" \t")
+            if stripped and not stripped.startswith("#") and line.startswith((" ", "\t")):
+                first_indent = line[: len(line) - len(stripped)]
+                break
+        indent = first_indent if first_indent else 4
         path_obj.write_text(
-            json.dumps(data, ensure_ascii=ensure_ascii, indent=4), encoding="utf-8"
+            json.dumps(data, ensure_ascii=ensure_ascii, indent=indent), encoding="utf-8"
         )
 
     return data

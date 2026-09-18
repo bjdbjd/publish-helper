@@ -99,8 +99,8 @@ def get_combo_box_data(data_name: str) -> Tuple[bool, list]:
                 ]
             }
 
-        # Check if the file exists / load with defaults（缺失 key 自动补齐并写回）
-        data = load_or_initialize_json(file_path, default_content)
+        # 文件不存在则以 default_content 创建；已存在时补齐缺失的数据键（对应原行为）并写回
+        data = load_or_initialize_json(file_path, default_content, backfill=True)
         return True, data[data_name]
 
     except Exception as e:
