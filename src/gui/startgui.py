@@ -2186,6 +2186,7 @@ class settings(QDialog, Ui_Settings):
         self.torrentStoragePath.setText(str(get_settings('torrent_storage_path')))
         self.ptGenApiUrl.setText(get_settings('pt_gen_api_url'))
         self.ptGenApiUrlBackup.setText(get_settings('pt_gen_api_url_backup'))
+        self.ptGenApiAuthSecret.setText(get_settings('pt_gen_auth_secret'))
         self.personalizedSignature.setText(get_settings('personalized_signature'))
         self.pictureBedApiUrl.setText(get_settings('picture_bed_api_url'))
         self.pictureBedApiToken.setText(get_settings('picture_bed_api_token'))
@@ -2225,6 +2226,7 @@ class settings(QDialog, Ui_Settings):
         update_settings('torrent_storage_path', self.torrentStoragePath.text())
         update_settings('pt_gen_api_url', self.ptGenApiUrl.text())
         update_settings('pt_gen_api_url_backup', self.ptGenApiUrlBackup.text())
+        update_settings('pt_gen_auth_secret', self.ptGenApiAuthSecret.text())
         update_settings('personalized_signature', self.personalizedSignature.text())
         update_settings('picture_bed_api_url', self.pictureBedApiUrl.text())
         update_settings('picture_bed_api_token', self.pictureBedApiToken.text())
@@ -2312,6 +2314,11 @@ class GetPtGenThread(QThread):
         self.resource_url = resource_url
 
     def run(self):
+        # 备用PT-Gen接口允许留空：留空视为不启用备用，直接跳过，
+        # 避免以空URL发起请求报 "Invalid URL" 并干扰结果判定
+        if not (self.api_url or '').strip():
+            print('未配置PT-Gen接口，跳过该线程')
+            return
         try:
             import json as _json
             # 这里放置耗时的HTTP请求操作

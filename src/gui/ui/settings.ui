@@ -217,6 +217,45 @@ QPushButton:pressed {
           </layout>
          </item>
          <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_ptgen_secret">
+           <property name="leftMargin">
+            <number>5</number>
+           </property>
+           <property name="topMargin">
+            <number>5</number>
+           </property>
+           <property name="rightMargin">
+            <number>5</number>
+           </property>
+           <property name="bottomMargin">
+            <number>5</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="label_ptgen_secret">
+             <property name="minimumSize">
+              <size>
+               <width>75</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>签名密钥:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="ptGenApiAuthSecret">
+             <property name="text">
+              <string/>
+             </property>
+             <property name="clearButtonEnabled">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
           <layout class="QHBoxLayout" name="horizontalLayout_29">
            <property name="leftMargin">
             <number>5</number>
@@ -1180,6 +1219,16 @@ QPushButton:pressed {
              </property>
              <property name="checked">
               <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="autoDownloadUploadPoster">
+             <property name="text">
+              <string>自动下载并上传海报</string>
+             </property>
+             <property name="checked">
+              <bool>false</bool>
              </property>
             </widget>
            </item>

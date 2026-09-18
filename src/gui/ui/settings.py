@@ -50,6 +50,19 @@ class Ui_Settings(object):
         self.ptGenApiUrlBackup.setObjectName("ptGenApiUrlBackup")
         self.horizontalLayout_28.addWidget(self.ptGenApiUrlBackup)
         self.verticalLayout.addLayout(self.horizontalLayout_28)
+        self.horizontalLayout_ptgen_secret = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_ptgen_secret.setContentsMargins(5, 5, 5, 5)
+        self.horizontalLayout_ptgen_secret.setObjectName("horizontalLayout_ptgen_secret")
+        self.label_ptgen_secret = QtWidgets.QLabel(parent=self.tab)
+        self.label_ptgen_secret.setMinimumSize(QtCore.QSize(75, 0))
+        self.label_ptgen_secret.setObjectName("label_ptgen_secret")
+        self.horizontalLayout_ptgen_secret.addWidget(self.label_ptgen_secret)
+        self.ptGenApiAuthSecret = QtWidgets.QLineEdit(parent=self.tab)
+        self.ptGenApiAuthSecret.setText("")
+        self.ptGenApiAuthSecret.setClearButtonEnabled(True)
+        self.ptGenApiAuthSecret.setObjectName("ptGenApiAuthSecret")
+        self.horizontalLayout_ptgen_secret.addWidget(self.ptGenApiAuthSecret)
+        self.verticalLayout.addLayout(self.horizontalLayout_ptgen_secret)
         self.horizontalLayout_29 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_29.setContentsMargins(5, 5, 5, 5)
         self.horizontalLayout_29.setObjectName("horizontalLayout_29")
@@ -717,6 +730,7 @@ class Ui_Settings(object):
 "    background-color: #3c6f1b;\n"
 "}\n"
 ""))
+        self.label_ptgen_secret.setText(_translate("Settings", "签名密钥:"))
         self.label_33.setStyleSheet(_translate("Settings", "QPushButton {\n"
 "    display: inline-block;\n"
 "    padding: 5px 5px;\n"
@@ -1214,29 +1228,6 @@ class Ui_Settings(object):
 "}\n"
 ""))
         self.deleteScreenshot.setText(_translate("Settings", "上传后删除本地图片"))
-        self.autoDownloadUploadPoster.setStyleSheet(_translate("Settings", "QPushButton {\n"
-"    display: inline-block;\n"
-"    padding: 5px 5px;\n"
-"    font-size: 16px;\n"
-"    cursor: pointer;\n"
-"    text-align: center;\n"
-"    text-decoration: none;\n"
-"    outline: none;\n"
-"    color:#fff;\n"
-"    background-color: #559e24;\n"
-"    border: none;\n"
-"    border-radius: 15px;\n"
-"    box-shadow: 0 9px #999;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"background-color: #4a8821;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: #3c6f1b;\n"
-"}\n"
-""))
         self.autoDownloadUploadPoster.setText(_translate("Settings", "自动下载并上传海报"))
         self.mediaInfoSuffix.setStyleSheet(_translate("Settings", "QPushButton {\n"
 "    display: inline-block;\n"
