@@ -1,9 +1,5 @@
 # Publish Helper 2.0
 
-## ⚠ 重点声明
-
-本工具仅授权用于资源整理和发布，拒绝洗种盗种，共同维护健康绿色的网络环境！
-
 > 🚀 **现代化PT资源发布助手** - 重构版本
 
 [![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
@@ -57,6 +53,45 @@ pip install -r requirements.txt
 # 配置环境（可选）
 cp .env.example .env
 # 编辑 .env 文件配置你的API密钥
+```
+
+### 系统依赖
+
+本项目使用 [pymediainfo](https://pypi.org/project/pymediainfo/) 提取视频信息，需要 `libmediainfo` 库支持。
+
+**Windows & macOS:** 无需手动安装，pymediainfo 已打包所需库文件。
+
+**Linux:** 需要手动安装 `libmediainfo`：
+
+```bash
+# Debian/Ubuntu
+apt install libmediainfo0v5
+
+# CentOS/RHEL/Fedora
+yum install libmediainfo  # 或 dnf install libmediainfo
+
+# Arch Linux
+pacman -S libmediainfo
+```
+
+### 中文字体（Linux 服务器）
+
+如果在 Linux 服务器上运行时中文显示为方块或乱码，需要安装中文字体：
+
+```bash
+# Debian/Ubuntu
+apt install fonts-wqy-zenhei fonts-wqy-microhei
+# 或使用 Noto CJK 字体（更全面）
+apt install fonts-noto-cjk
+
+# CentOS/RHEL/Fedora
+yum install wqy-zenhei-fonts
+
+# Arch Linux
+pacman -S wqy-zenhei
+
+# 刷新字体缓存
+fc-cache -f -v
 ```
 
 ### 运行
