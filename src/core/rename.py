@@ -3,6 +3,7 @@ import json
 import os
 import re
 import shutil
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from pymediainfo import MediaInfo
 
@@ -10,7 +11,9 @@ from src.core.tool import get_settings, get_abbreviation, chinese_to_int
 
 
 # 从PT-Gen响应中读取关键数据
-def get_pt_gen_info(description, raw_data=None):
+def get_pt_gen_info(
+    description: str, raw_data: Optional[Dict[str, Any]] = None
+) -> Tuple[str, str, Union[str, int], List[str], str, List[str], Optional[int], Optional[int]]:
     """从PT-Gen响应中读取关键数据。
 
     当 raw_data（PT-Gen API 的原始 JSON 响应字典）可用时，直接从结构化数据中
@@ -255,7 +258,7 @@ def get_pt_gen_info(description, raw_data=None):
 
 
 
-def get_video_info(file_path):
+def get_video_info(file_path: str) -> Tuple[bool, list]:
     if not os.path.exists(file_path):
         print('文件路径不存在')
         return False, ['视频文件路径不存在']
@@ -320,7 +323,9 @@ def get_video_info(file_path):
                 if track.other_language == 'English' and '英字' not in tags:
                     tags.append('英字')
 
-        if extract_numbers(width) > extract_numbers(height):  # 获取较长边的分辨率
+        width_num = extract_numbers(width)
+        height_num = extract_numbers(height)
+        if (width_num or 0) > (height_num or 0):  # 获取较长边的分辨率
             video_format += width
         else:
             video_format += height
@@ -329,7 +334,7 @@ def get_video_info(file_path):
         # 如果没有获取到别称（通过以 ' pixels' 结尾为特征判断）
         if video_format[-7:] == ' pixels':
             # 自动获取默认的值
-            video_format = approximate_resolution_by_width(extract_numbers(video_format))
+            video_format = approximate_resolution_by_width(extract_numbers(video_format) or 0)
 
         if audio_count == 1:
             audio_num = ''
@@ -349,7 +354,7 @@ def get_video_info(file_path):
 
 
 # 通过分段分辨率信息获取默认分辨率简称
-def approximate_resolution_by_width(width):
+def approximate_resolution_by_width(width: int) -> str:
     midpoints = load_min_widths_from_json('static/abbreviation.json')
 
     for midpoint in sorted(midpoints.keys(), reverse=True):
@@ -359,7 +364,7 @@ def approximate_resolution_by_width(width):
 
 
 # 从json读取分段分辨率简写信息
-def load_min_widths_from_json(filepath='static/abbreviation.json'):
+def load_min_widths_from_json(filepath: str = 'static/abbreviation.json') -> Dict[int, str]:
     default_min_widths = {
         '9600': '8640p',
         '4608': '4320p',
@@ -399,7 +404,7 @@ def load_min_widths_from_json(filepath='static/abbreviation.json'):
 
 
 # 用于在分辨率中提取数字
-def extract_numbers(string):
+def extract_numbers(string: str) -> Union[int, None]:
     result = ''
     for char in string:
         if char.isdigit():
@@ -410,9 +415,9 @@ def extract_numbers(string):
         return None
 
 
-def get_name_from_template(english_title, original_title, season, episode, year, video_format, source, video_codec,
-                           bit_depth, hdr_format, frame_rate, audio_codec, channels, audio_num, team, other_titles,
-                           season_number, total_episodes, playlet_source, categories, actors, template):
+def get_name_from_template(english_title: str, original_title: str, season: str, episode: str, year: str, video_format: str, source: str, video_codec: str,
+                           bit_depth: str, hdr_format: str, frame_rate: str, audio_codec: str, channels: str, audio_num: str, team: str, other_titles: str,
+                           season_number: str, total_episodes: str, playlet_source: str, categories: str, actors: str, template: str) -> str:
     name = get_settings(template)  # 获取模板
     # 开始替换关键字
     name = name.replace('{en_title}', english_title)
@@ -453,10 +458,10 @@ def get_name_from_template(english_title, original_title, season, episode, year,
         name = re.sub(r'\.@', '@', name)  # 将'.@'变成'@'
     if name[0] == '.' or name[0] == ' ':
         name = name[1:]  # 避免首字符为'.'或者' '
-    return name
+    return str(name)
 
 
-def rename_file(file_path, new_file_name):
+def rename_file(file_path: str, new_file_name: str) -> Tuple[bool, str]:
     new_file_name = re.sub(r'[<>:\'/\\|?*]', '.', new_file_name)
     # 分割原始文件名以获取扩展名和目录
     file_dir, file_base = os.path.split(file_path)
@@ -480,7 +485,7 @@ def rename_file(file_path, new_file_name):
         return False, f'重命名文件时出错：{e}'
 
 
-def rename_folder(current_folder_path, new_name):
+def rename_folder(current_folder_path: str, new_name: str) -> Tuple[bool, str]:
     """
     对目标文件夹进行重命名。
 
@@ -515,7 +520,7 @@ def rename_folder(current_folder_path, new_name):
         return False, f'重命名目录时发生错误：{e}'
 
 
-def move_file_to_folder(file_path, folder_name):
+def move_file_to_folder(file_path: str, folder_name: str) -> Tuple[bool, str]:
     """
     将文件移动到同目录下的指定文件夹中，除非文件已在该文件夹中。
 
@@ -554,7 +559,7 @@ def move_file_to_folder(file_path, folder_name):
         return False, f'移动文件时出错：{e}'
 
 
-def create_hard_link(path):
+def create_hard_link(path: str) -> Tuple[bool, str]:
     try:
         # 检查输入路径是否存在
         if not os.path.exists(path):
@@ -600,6 +605,9 @@ def create_hard_link(path):
 
             # 返回成功创建文件夹硬链接
             return True, link_path
+
+        # 路径既不是文件也不是文件夹
+        return False, f'Unsupported path type: {path}'
 
     except FileExistsError:
         return False, 'Hard link already exists'

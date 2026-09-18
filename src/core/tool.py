@@ -5,6 +5,7 @@ import json
 import os
 import random
 import re
+from typing import Any, Dict, List, Tuple, Union
 
 from torf import Torrent
 from xpinyin import Pinyin
@@ -19,9 +20,13 @@ from src.core.settings_tool import (
     update_settings_json,
 )
 
+# 视频文件扩展名（统一常量，供 check_path_and_find_video / get_video_files 复用）
+VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.avi', '.flv', '.mkv', '.mpeg', '.mpg', '.rm', '.rmvb', '.ts', '.m2ts']
+
 
 # 写一个方法，取当前工程工作目录与传入的目录，组合成一个新的目录
-def combine_directories(path):
+# 项目里被 API（拼 media/temp 路径）及 get_combo_box_data/get_abbreviation 使用。
+def combine_directories(path: str) -> str:
     """
     取当前工程工作目录与传入相对路径，生成新的路径
 
@@ -32,7 +37,7 @@ def combine_directories(path):
     return os.path.join(project_dir, path)
 
 
-def get_combo_box_data(data_name):
+def get_combo_box_data(data_name: str) -> Tuple[bool, list]:
     try:
         # Define the file path
         file_path = combine_directories('static/combo-box-data.json')
@@ -107,7 +112,7 @@ def get_combo_box_data(data_name):
         return False, [str(e)]
 
 
-def update_combo_box_data(configuration_data, configuration_name):
+def update_combo_box_data(configuration_data: str, configuration_name: str) -> Tuple[bool, str]:
     # 将给定的字符串分割成列表
     sources_list = configuration_data.split('\\n')
 
@@ -146,7 +151,7 @@ def update_combo_box_data(configuration_data, configuration_name):
         return False, f'更新失败，错误：{str(e)}'
 
 
-def get_picture_bed_type(picture_bed_api_url):
+def get_picture_bed_type(picture_bed_api_url: str) -> Tuple[bool, str]:
     try:
         # Define the file path
         file_path = combine_directories('static/picture-bed-data.json')
@@ -213,7 +218,7 @@ def get_picture_bed_type(picture_bed_api_url):
         return False, str(e)
 
 
-def find_picture_bed_type(picture_bed_api_url, picture_bed_api_data):
+def find_picture_bed_type(picture_bed_api_url: str, picture_bed_api_data: dict) -> Tuple[bool, str]:
     """
     根据给定的URL和JSON数据，寻找URL对应的标识符。
     如果URL以http开头，自动替换为https。
@@ -244,7 +249,7 @@ def find_picture_bed_type(picture_bed_api_url, picture_bed_api_data):
     return False, f'您使用的图床上传接口{picture_bed_api_url}暂未配置，请检查static/picture-bed-data.json文件，如果您的图床符合其中的配置，可将上传接口URL按照格式添加到对应类型下'
 
 
-def get_abbreviation(original_name, json_file_path='static/abbreviation.json'):
+def get_abbreviation(original_name: str, json_file_path: str = 'static/abbreviation.json') -> str:
     print('开始对参数名称进行转化')
     try:
 
@@ -312,7 +317,7 @@ def get_abbreviation(original_name, json_file_path='static/abbreviation.json'):
             abbreviation_map = json.load(file)
 
         # Return the abbreviation if found, else return the original name
-        return abbreviation_map.get(original_name, original_name)
+        return str(abbreviation_map.get(original_name, original_name))
     except FileNotFoundError:
         print(f'File not found: {json_file_path}')
         return original_name
@@ -322,7 +327,7 @@ def get_abbreviation(original_name, json_file_path='static/abbreviation.json'):
 
 
 # 此方法用于自动生成一个不易重复的图片文件名称
-def generate_image_filename(base_path):
+def generate_image_filename(base_path: str) -> str:
     now = datetime.datetime.now()
     date_time = now.strftime('%Y%m%d-%H%M%S')
     letters = random.sample('0123456789', 6)
@@ -332,9 +337,9 @@ def generate_image_filename(base_path):
     return path
 
 
-def check_path_and_find_video(path):
+def check_path_and_find_video(path: str) -> Tuple[int, str]:
     # 指定的视频文件类型列表
-    video_extensions = ['.mp4', '.m4v', '.avi', '.flv', '.mkv', '.mpeg', '.mpg', '.rm', '.rmvb', '.ts', '.m2ts']
+    video_extensions = VIDEO_EXTENSIONS  # 复用模块级常量，避免两份定义漂移
 
     # 如果最后一位加了'/'则默认去除
     if path.endswith('/'):
@@ -365,13 +370,13 @@ def check_path_and_find_video(path):
         return 0, f'您提供的路径{path}既不是文件也不是文件夹'  # 路径既不是文件也不是文件夹
 
 
-def get_playlet_description(original_title, year, area, category, language, season_number):
+def get_playlet_description(original_title: str, year: str, area: str, category: str, language: str, season_number: str) -> str:
     if season_number != '1':
         original_title += ' 第' + int_to_chinese(int(season_number)) + '季'
     return f'\n◎片　　名　{original_title}\n◎年　　代　{year}\n◎产　　地　{area}\n◎类　　别　{category}\n◎语　　言　{language}\n◎简　　介　\n'
 
 
-def make_torrent(path, torrent_storage_path):
+def make_torrent(path: str, torrent_storage_path: str) -> Tuple[bool, str]:
     print(path + '  ' + torrent_storage_path)
     try:
         # 检查路径是否存在
@@ -418,14 +423,14 @@ def make_torrent(path, torrent_storage_path):
         return False, str(e)
 
 
-def load_names(file_path, name):
+def load_names(file_path: str, name: str) -> Any:
     with open(file_path, 'r', encoding='utf-8') as file:
         data = json.load(file)
 
         return data[name]
 
 
-def chinese_name_to_pinyin(chinese_name):
+def chinese_name_to_pinyin(chinese_name: str) -> str:
     p = Pinyin()
     result = ''
     py = p.get_pinyin(chinese_name)
@@ -451,7 +456,7 @@ def chinese_name_to_pinyin(chinese_name):
     return result
 
 
-def convert_chinese_punctuation_to_english(text):
+def convert_chinese_punctuation_to_english(text: str) -> str:
     # Mapping of Chinese punctuation to English punctuation
     punctuation_map = {
         '，': ', ',  # Comma
@@ -483,17 +488,17 @@ def convert_chinese_punctuation_to_english(text):
     return text
 
 
-def natural_keys(text):
+def natural_keys(text: str) -> List[Union[int, str]]:
     """
     alist.sort(key=natural_keys) 使用这个函数作为key来按数字顺序排序文本
     """
     return [int(c) if c.isdigit() else c.lower() for c in re.split('(\d+)', text)]
 
 
-def get_video_files(folder_path):
+def get_video_files(folder_path: str) -> Tuple[bool, list]:
     try:
-        # 要查找的视频文件扩展名列表
-        video_extensions = ['.mp4', '.m4v', '.avi', '.flv', '.mkv', '.mpeg', '.mpg', '.rm', '.rmvb', '.ts', '.m2ts']
+        # 要查找的视频文件扩展名列表（复用模块级常量）
+        video_extensions = VIDEO_EXTENSIONS
 
         # 检查文件夹路径是否有效和可访问
         if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
@@ -518,7 +523,7 @@ def get_video_files(folder_path):
         return False, [f'错误：{e}']
 
 
-def int_to_roman(num):
+def int_to_roman(num: int) -> str:
     val = [
         1000, 900, 500, 400,
         100, 90, 50, 40,
@@ -541,7 +546,7 @@ def int_to_roman(num):
     return roman_num
 
 
-def int_to_special_roman(num):
+def int_to_special_roman(num: int) -> str:
     special_roman_dict = {
         1: 'Ⅰ',
         2: 'Ⅱ',
@@ -560,7 +565,7 @@ def int_to_special_roman(num):
         return str(num)
 
 
-def int_to_chinese(num):
+def int_to_chinese(num: int) -> str:
     if num < 0 or num > 9999:
         return '数字超出范围'
 
@@ -586,7 +591,7 @@ def int_to_chinese(num):
     return ''.join(parts[::-1])
 
 
-def chinese_to_int(chinese_num):
+def chinese_to_int(chinese_num: str) -> Union[int, None]:
     try:
         # 定义中文数字到阿拉伯数字的映射
         num_map = {
@@ -631,7 +636,7 @@ def chinese_to_int(chinese_num):
         return None
 
 
-def is_filename_too_long(filename):
+def is_filename_too_long(filename: str) -> bool:
     max_filename_length = 250  # Windows下文件名最长为255，去除掉后缀名为250
     if len(filename) > max_filename_length:
         return True
@@ -639,7 +644,7 @@ def is_filename_too_long(filename):
         return False
 
 
-def delete_season_number(title, season_number):
+def delete_season_number(title: str, season_number: str) -> str:
     # 仅移除位于标题末尾的季数后缀，避免误伤标题中间的数字
     # （例如 "Ni Hao 1983" 在 season=1 时不应被改写为 "Ni Hao983"）
     title = title.rstrip()
@@ -660,11 +665,11 @@ def delete_season_number(title, season_number):
     return title.strip()
 
 
-def base64encoding(string):
+def base64encoding(string: str) -> str:
     return base64.b64encode(string.encode('utf-8')).decode('utf-8')
 
 
-def get_data_from_pt_gen_description(main_title, description, media_info, source, category):
+def get_data_from_pt_gen_description(main_title: str, description: str, media_info: str, source: str, category: str) -> Tuple[str, str, str, str, str, str, str, str]:
     imdb_url = ''  # IMDb链接
     douban_url = ''  # 豆瓣链接
     description = description  # 简介
@@ -798,7 +803,7 @@ def get_data_from_pt_gen_description(main_title, description, media_info, source
     return imdb_url, douban_url, category, area, video_format, audio_codec, video_codec, medium
 
 
-def validate_and_convert_to_int(value, value_name):
+def validate_and_convert_to_int(value: Any, value_name: str) -> int:
     if value is None or value == '':
         raise ValueError(f'{value_name} 不能为 None 或空字符串')
 

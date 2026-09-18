@@ -112,7 +112,7 @@ class SettingsManager:
         """Read settings from file."""
         try:
             with open(self.settings_file, "r", encoding="utf-8") as file:
-                settings = json.load(file)
+                settings: Dict[str, Any] = json.load(file)
             logger.debug(f"Loaded settings from {self.settings_file}")
             return settings
         except (json.JSONDecodeError, IOError) as e:
