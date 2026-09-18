@@ -161,7 +161,7 @@ def process_poster_in_description(description):
     """
     import re
 
-    auto_download_upload_poster = get_settings('auto_download_upload_poster') == 'True'
+    auto_download_upload_poster = get_settings('auto_download_upload_poster')
     if not auto_download_upload_poster:
         return description
 
@@ -230,14 +230,14 @@ def print_settings_summary():
     print(f"{Colors.BOLD}当前配置 / Current Settings:{Colors.END}")
 
     # File management
-    rename_file = get_settings('rename_file') == 'True'
-    make_dir = get_settings('make_dir') == 'True'
-    create_hardlink = get_settings('create_hard_link') == 'True'
+    rename_file = get_settings('rename_file')
+    make_dir = get_settings('make_dir')
+    create_hardlink = get_settings('create_hard_link')
 
     # Screenshot settings
-    auto_upload = get_settings('auto_upload_screenshot') == 'True'
-    delete_after_upload = get_settings('delete_screenshot') == 'True'
-    do_thumbnail = get_settings('do_get_thumbnail') == 'True'
+    auto_upload = get_settings('auto_upload_screenshot')
+    delete_after_upload = get_settings('delete_screenshot')
+    do_thumbnail = get_settings('do_get_thumbnail')
     screenshot_num = get_settings('screenshot_number')
 
     print(
@@ -542,9 +542,9 @@ def process_movie(resource_url, video_path):
     print(f"\n{Colors.BOLD}执行后续操作...{Colors.END}")
 
     # Rename (matching GUI logic exactly)
-    do_rename = get_settings('rename_file') == 'True'
-    make_dir = get_settings('make_dir') == 'True'
-    create_hardlink = get_settings('create_hard_link') == 'True'
+    do_rename = get_settings('rename_file')
+    make_dir = get_settings('make_dir')
+    create_hardlink = get_settings('create_hard_link')
 
     if do_rename:
         print("正在重命名...")
@@ -661,11 +661,11 @@ def process_movie(resource_url, video_path):
         get_settings('screenshot_start_percentage') or 0.10)
     screenshot_end_percentage = float(
         get_settings('screenshot_end_percentage') or 0.90)
-    do_get_thumbnail = get_settings('do_get_thumbnail') == 'True'
+    do_get_thumbnail = get_settings('do_get_thumbnail')
     thumbnail_rows = int(get_settings('thumbnail_rows') or 3)
     thumbnail_cols = int(get_settings('thumbnail_cols') or 3)
-    auto_upload_screenshot = get_settings('auto_upload_screenshot') == 'True'
-    delete_screenshot = get_settings('delete_screenshot') == 'True'
+    auto_upload_screenshot = get_settings('auto_upload_screenshot')
+    delete_screenshot = get_settings('delete_screenshot')
 
     print("正在生成截图...")
     pictures = []
@@ -726,7 +726,7 @@ def process_movie(resource_url, video_path):
                     print(f"  {url}")
 
                 # Append uploaded picture URLs to description if setting enabled
-                paste_screenshot_url = get_settings('paste_screenshot_url') == 'True'
+                paste_screenshot_url = get_settings('paste_screenshot_url')
                 if paste_screenshot_url:
                     for url in uploaded_urls:
                         # Only append if it's a valid BBCode URL (not local path)
@@ -996,9 +996,9 @@ def process_tv(resource_url, video_path, season, episodes_start):
     print(f"\n{Colors.BOLD}执行后续操作...{Colors.END}")
 
     # Rename (matching GUI logic exactly)
-    do_rename = get_settings('rename_file') == 'True'
-    make_dir = get_settings('make_dir') == 'True'
-    create_hardlink = get_settings('create_hard_link') == 'True'
+    do_rename = get_settings('rename_file')
+    make_dir = get_settings('make_dir')
+    create_hardlink = get_settings('create_hard_link')
 
     if do_rename:
         print("正在重命名...")
@@ -1150,11 +1150,11 @@ def process_tv(resource_url, video_path, season, episodes_start):
         get_settings('screenshot_start_percentage') or 0.10)
     screenshot_end_percentage = float(
         get_settings('screenshot_end_percentage') or 0.90)
-    do_get_thumbnail = get_settings('do_get_thumbnail') == 'True'
+    do_get_thumbnail = get_settings('do_get_thumbnail')
     thumbnail_rows = int(get_settings('thumbnail_rows') or 3)
     thumbnail_cols = int(get_settings('thumbnail_cols') or 3)
-    auto_upload_screenshot = get_settings('auto_upload_screenshot') == 'True'
-    delete_screenshot = get_settings('delete_screenshot') == 'True'
+    auto_upload_screenshot = get_settings('auto_upload_screenshot')
+    delete_screenshot = get_settings('delete_screenshot')
 
     print("正在生成截图...")
     pictures = []
@@ -1211,7 +1211,7 @@ def process_tv(resource_url, video_path, season, episodes_start):
                     print(f"  {url}")
 
                 # Append uploaded picture URLs to description if setting enabled
-                paste_screenshot_url = get_settings('paste_screenshot_url') == 'True'
+                paste_screenshot_url = get_settings('paste_screenshot_url')
                 if paste_screenshot_url:
                     for url in uploaded_urls:
                         # Only append if it's a valid BBCode URL (not local path)
@@ -1444,9 +1444,9 @@ def process_playlet(original_title, year, area, categories, language, playlet_so
     print_step(6, total_steps, "重命名和后续处理...")
 
     # Rename (matching GUI logic exactly)
-    do_rename = get_settings('rename_file') == 'True'
-    make_dir = get_settings('make_dir') == 'True'
-    create_hardlink = get_settings('create_hard_link') == 'True'
+    do_rename = get_settings('rename_file')
+    make_dir = get_settings('make_dir')
+    create_hardlink = get_settings('create_hard_link')
 
     if do_rename:
         print("正在重命名...")
@@ -1563,11 +1563,11 @@ def process_playlet(original_title, year, area, categories, language, playlet_so
         get_settings('screenshot_start_percentage') or 0.10)
     screenshot_end_percentage = float(
         get_settings('screenshot_end_percentage') or 0.90)
-    do_get_thumbnail = get_settings('do_get_thumbnail') == 'True'
+    do_get_thumbnail = get_settings('do_get_thumbnail')
     thumbnail_rows = int(get_settings('thumbnail_rows') or 3)
     thumbnail_cols = int(get_settings('thumbnail_cols') or 3)
-    auto_upload_screenshot = get_settings('auto_upload_screenshot') == 'True'
-    delete_screenshot = get_settings('delete_screenshot') == 'True'
+    auto_upload_screenshot = get_settings('auto_upload_screenshot')
+    delete_screenshot = get_settings('delete_screenshot')
 
     print("正在生成截图...")
     pictures = []
@@ -1624,7 +1624,7 @@ def process_playlet(original_title, year, area, categories, language, playlet_so
                     print(f"  {url}")
 
                 # Append uploaded picture URLs to description if setting enabled
-                paste_screenshot_url = get_settings('paste_screenshot_url') == 'True'
+                paste_screenshot_url = get_settings('paste_screenshot_url')
                 if paste_screenshot_url:
                     for url in uploaded_urls:
                         # Only append if it's a valid BBCode URL (not local path)
