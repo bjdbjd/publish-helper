@@ -511,7 +511,7 @@ def check_path_and_find_video(path):
 
     # 检查路径是否是一个文件
     if os.path.isfile(path):
-        if any(path.endswith(ext) for ext in video_extensions):
+        if any(path.lower().endswith(ext) for ext in video_extensions):
             return 1, path  # 是文件且符合视频类型
         print(f'路径下获取到文件{path}，但该文件不符合视频类型')
         return 0, f'路径下获取到文件{path}，但该文件不符合视频类型'  # 是文件，但不符合视频类型
@@ -519,7 +519,7 @@ def check_path_and_find_video(path):
     # 检查路径是否是一个文件夹
     elif os.path.isdir(path):
         for file in os.listdir(path):
-            if any(file.endswith(ext) for ext in video_extensions):
+            if any(file.lower().endswith(ext) for ext in video_extensions):
                 print(path + file)
                 return 2, path + '/' + file  # 在文件夹中找到符合类型的视频文件
         print('文件夹中没有符合类型的视频文件')
@@ -667,12 +667,11 @@ def get_video_files(folder_path):
         # 初始化一个空列表来存储文件路径
         video_files = []
 
-        # 遍历每个扩展名，并将匹配的文件添加到列表中
-        for extension in video_extensions:
-            # Glob模式匹配文件
-            pattern = os.path.join(folder_path, '*' + extension)
-            # 查找匹配的文件并扩展列表
-            video_files.extend(glob.glob(pattern))
+        # 遍历文件夹中的所有文件
+        for file in os.listdir(folder_path):
+            # 检查文件扩展名（不区分大小写）
+            if any(file.lower().endswith(ext) for ext in video_extensions):
+                video_files.append(os.path.join(folder_path, file))
 
         # 使用自定义的natural_keys函数进行排序
         video_files.sort(key=natural_keys)
@@ -806,23 +805,23 @@ def is_filename_too_long(filename):
 
 
 def delete_season_number(title, season_number):
-    lowercase_season_info_without_spaces = ' season' + season_number  # 用于后期替换多余的season名称
-    uppercase_season_info_without_spaces = ' Season' + season_number  # 用于后期替换多余的Season名称
-    lowercase_season_info_with_spaces = ' season ' + season_number  # 用于后期替换多余的season名称
-    uppercase_season_info_with_spaces = ' Season ' + season_number  # 用于后期替换多余的Season名称
-    number_season_name = ' ' + season_number  # 用于后期替换多余的数字季名称
-    roman_season_name = ' ' + int_to_roman(int(season_number))  # 用于后期替换多余的罗马季名称
-    special_roman_season_name = ' ' + int_to_special_roman(int(season_number))  # 用于后期替换多余的特殊罗马季名称
-
-    # Remove the specified strings from the title
-    title = title.replace(lowercase_season_info_without_spaces, '')
-    title = title.replace(uppercase_season_info_without_spaces, '')
-    title = title.replace(lowercase_season_info_with_spaces, '')
-    title = title.replace(uppercase_season_info_with_spaces, '')
-    title = title.replace(number_season_name, '')
-    title = title.replace(roman_season_name, '')
-    title = title.replace(special_roman_season_name, '')
-
+    # 仅移除位于标题末尾的季数后缀，避免误伤标题中间的数字
+    # （例如 "Ni Hao 1983" 在 season=1 时不应被改写为 "Ni Hao983"）
+    title = title.rstrip()
+    suffixes = [
+        ' Season ' + season_number,
+        ' season ' + season_number,
+        ' Season' + season_number,
+        ' season' + season_number,
+        ' ' + season_number,
+        ' ' + int_to_roman(int(season_number)),
+        ' ' + int_to_special_roman(int(season_number)),
+    ]
+    # 先匹配最长后缀，避免 " Season 1" 被先匹配为 " 1"
+    for suffix in sorted(suffixes, key=len, reverse=True):
+        if title.endswith(suffix):
+            title = title[: -len(suffix)]
+            break
     return title.strip()
 
 

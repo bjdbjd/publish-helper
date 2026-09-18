@@ -30,6 +30,11 @@ def get_pt_gen_description(pt_gen_api_url, resource_url):
         # 尝试解析JSON响应
         try:
             data = response.json()
+            print(f'[DEBUG] PT-Gen API URL: {pt_gen_api_url}')
+            print(f'[DEBUG] Resource URL: {resource_url}')
+            print(f'[DEBUG] Response keys: {list(data.keys())}')
+            print(f'[DEBUG] chinese_title: {data.get("chinese_title", "N/A")}')
+            print(f'[DEBUG] foreign_title: {data.get("foreign_title", "N/A")}')
         except ValueError:
             print('响应不是有效的JSON格式')
             return False, 'PT-Gen接口响应不是有效的JSON格式，请检查PT-Gen接口是否正常'
@@ -37,16 +42,47 @@ def get_pt_gen_description(pt_gen_api_url, resource_url):
         # 根据响应结构获取format字段
         format_data = data.get('format') if 'format' in data else data.get('data', {}).get('format', '')
 
-        # 返回处理后的format字段
+        # 返回处理后的format字段和完整的数据
         if format_data != '' and format_data is not None:
+            print(f'[DEBUG] Raw format_data (first 500 chars): {repr(format_data[:500])}')
             format_data = format_data.replace('&#39;', '\'')
+
+            # Post-process: restructure title fields using raw data
+            # 片名 = foreign_title, 译名 = chinese_title, 别名 = aka titles
+            chinese_title = data.get('chinese_title', '')
+            if chinese_title:
+                import re as _re
+                # Match the 译名 line with both ◎ and ❁ prefix formats
+                # Pattern: prefix + 译　　名 + separator + content + newline
+                trans_pattern = _re.compile(
+                    r'(([◎❁])\s*译\s*名\s*[:：]?\s*)(.*?)(\n)',
+                    _re.DOTALL
+                )
+                match = trans_pattern.search(format_data)
+                if match:
+                    prefix_char = match.group(2)  # ◎ or ❁
+                    aka_content = match.group(3).strip()  # original 译名 content (aka titles)
+                    # Detect the separator style used in the description
+                    # ◎ format uses ◎译　　名　, ❁ format uses ❁ 译　　名:　
+                    if prefix_char == '❁':
+                        new_trans_line = f'❁ 译　　名:　{chinese_title}\n'
+                        if aka_content:
+                            new_trans_line += f'❁ 别　　名:　{aka_content}\n'
+                    else:
+                        new_trans_line = f'◎译　　名　{chinese_title}\n'
+                        if aka_content:
+                            new_trans_line += f'◎别　　名　{aka_content}\n'
+                    format_data = format_data[:match.start()] + new_trans_line + format_data[match.end():]
+                    print(f'[DEBUG] Restructured title fields: 译名={chinese_title}')
+
             personalized_signature = get_settings("personalized_signature")
             # 处理简介
             if personalized_signature != '' and format_data is not None:
                 format_data = personalized_signature + '\n' + format_data
             format_data += '\n'
             format_data = format_data.replace('img1', 'img2')
-            return True, format_data
+            # Return both format and full data for poster URL extraction
+            return True, (format_data, data)
         else:
             return False, '获取到的PT-Gen简介为空，可能是资源链接有误或PT-Gen接口出错，请检查后重试'
 
