@@ -114,8 +114,9 @@ def get_settings(settings_name):
     standard_values = {
         'screenshot_storage_path': 'temp/pic',
         'torrent_storage_path': 'temp/torrent',
-        'pt_gen_api_url': 'https://ptgen.agsvpt.work/',
+        'pt_gen_api_url': 'https://pt-gen.hares.dpdns.org/api/getData',
         'pt_gen_api_url_backup': 'https://ptgen.agsvpt.work/',
+        'pt_gen_auth_secret': 'hares.23663',
         'personalized_signature': '',
         'picture_bed_api_url': 'https://freeimage.host/api/1/upload',
         'picture_bed_api_token': '6d207e02198a847aa98d0a2a901485a5',

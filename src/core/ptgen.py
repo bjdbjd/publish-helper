@@ -1,6 +1,72 @@
+import base64
+import hashlib
+import hmac
+import sys
+import time
+from urllib.parse import urlunsplit, urlsplit
+
 import requests
 
 from src.core.tool import get_settings
+
+# Windows 控制台默认编码(GBK)无法打印 ❁/◎ 等字符，调试 print 会抛 UnicodeEncodeError
+# 并意外中断请求。将 stdout/stderr 编码错误改为 replace，仅影响打印、不影响数据。
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(errors='replace')
+    sys.stderr.reconfigure(errors='replace')
+
+
+_NEW_PTGEN_HOSTS = {'pt-gen.hares.dpdns.org'}
+
+
+def _is_new_pt_gen_api(api_url):
+    """新 PT-Gen-Refactor 服务，走 HMAC-SHA256 签名鉴权(/api/getData)。
+
+    识别依据：URL 路径含 /api，或主机是已知新版服务域名(兼容只填根地址的情况)。
+    老服务(根 GET ?url=)不含以上特征，保持旧逻辑向后兼容。
+    """
+    api_url = (api_url or '').split('?')[0]
+    if '/api' in api_url:
+        return True
+    try:
+        return urlsplit(api_url).hostname in _NEW_PTGEN_HOSTS
+    except Exception:
+        return False
+
+
+def _norm_ptgen_url(api_url):
+    """新版服务统一规范到 <scheme>://<host>/api/getData。
+
+    无论用户填的是根地址、/api 还是 /api/getData，都归一为完整业务端点；
+    老服务保持原样。
+    """
+    api_url = (api_url or '').split('?')[0]
+    if not _is_new_pt_gen_api(api_url):
+        return api_url.rstrip('/')
+    parts = urlsplit(api_url)
+    host = parts.netloc or parts.path
+    return urlunsplit((parts.scheme or 'https', host, '/api/getData', '', ''))
+
+
+def _auth_signature(secret):
+    """生成新服务的 X-Timestamp / X-Signature(HMAC-SHA256, base64url)。
+
+    与服务端 frontend/src/App.jsx 的 generateAuthSignature 及
+    worker/src/utils/request.js 的 verifySignature 保持一致。
+    """
+    ts = str(int(time.time() * 1000))
+    digest = hmac.new(secret.encode(), ts.encode(), hashlib.sha256).digest()
+    sig = base64.b64encode(digest).decode()
+    sig = sig.replace('+', '-').replace('/', '_').rstrip('=')
+    return ts, sig
+
+
+def _get_auth_secret():
+    """读取新服务签名密钥，缺省用公开 demo 的 AUTH_SECRET。"""
+    try:
+        return get_settings('pt_gen_auth_secret') or 'hares.23663'
+    except Exception:
+        return 'hares.23663'
 
 
 def get_pt_gen_description(pt_gen_api_url, resource_url):
@@ -19,8 +85,16 @@ def get_pt_gen_description(pt_gen_api_url, resource_url):
         # 去除后缀
         resource_url = resource_url.split('?')[0]
 
-        # 设置一个合理的超时时间，10s
-        response = requests.get(f'{pt_gen_api_url}?url={resource_url}', timeout=10)
+        # 构造请求。新服务(/api/getData)需附带 HMAC 签名头；老服务(根 GET ?url=)保持不变。
+        api_url = _norm_ptgen_url(pt_gen_api_url)
+        headers = {}
+        params = {'url': resource_url}
+        if _is_new_pt_gen_api(pt_gen_api_url):
+            ts, sig = _auth_signature(_get_auth_secret())
+            headers = {'X-Timestamp': ts, 'X-Signature': sig}
+            params['requestId'] = f'req_publish_helper_{ts}'
+        # 新服务首次抓取豆瓣可能较慢，超时放宽到 30s
+        response = requests.get(api_url, params=params, headers=headers, timeout=30)
 
         # 检查响应是否成功
         if response.status_code != 200:

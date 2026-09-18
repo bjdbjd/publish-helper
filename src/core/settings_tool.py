@@ -42,8 +42,9 @@ class SettingsManager:
             "api_port": "15372",
             "enable_api": "True",
             # PT-Gen Configuration
-            "pt_gen_api_url": "https://ptgen.agsvpt.work/",
+            "pt_gen_api_url": "https://pt-gen.hares.dpdns.org/api/getData",
             "pt_gen_api_url_backup": "https://ptgen.agsvpt.work/",
+            "pt_gen_auth_secret": "hares.23663",
             # Image hosting
             "picture_bed_api_url": "https://freeimage.host/api/1/upload",
             "picture_bed_api_token": "6d207e02198a847aa98d0a2a901485a5",
