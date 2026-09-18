@@ -7,7 +7,6 @@ under certain conditions; type `show c' for details.
 The licensing of this program is under the GNU General Public License version 3 (GPLv3) or later.
 For more information on this license, you can visit https://www.gnu.org/licenses/gpl-3.0.html
 """
-from src.gui.startgui import start_gui
 """
 打包编译方式(Windows)：安装Python 3.10，执行pip install pyinstaller，安装“docs/requirements.txt”中的所有相关模块后，在项目根目录（README文件所在目录）下执行下面的代码：
 
@@ -31,5 +30,10 @@ copy readme.txt dist\
 
 # 作者：bjdbjd ID：bjd
 # 贡献者：Pixel-LH、EasonWong0603、sertion1126、TommyMerlin
+#
+# 旧版入口：作为薄转发指向新版 main_gui_new.main（同一业务：src.gui.startgui.start_gui），
+# 保留本文件的 PyInstaller 打包命令可用。日常开发请用 src/main_gui_new.py。
+from src.main_gui_new import main
+
 if __name__ == '__main__':
-    start_gui()  # GUI启动
+    main()  # GUI启动（转发到新版入口）
