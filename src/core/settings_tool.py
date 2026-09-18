@@ -2,15 +2,34 @@
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from config.settings import config
-from utils.exceptions import ConfigurationError
-from utils.file_utils import ensure_directory
-from utils.logger import get_logger
+# 导入兼容桥：扁平导入 (config.*/utils.*) 要求 src/ 在 sys.path 上。
+# _new 入口 (main_gui_new/main_api_new) 会插入 src/；旧入口 (main_gui/main_api,
+# PyInstaller 打包用) 不插。这里在缺省时手动把 src/ 补进 sys.path，保证两套入口都能工作。
+try:
+    from config.settings import config
+    from utils.exceptions import ConfigurationError
+    from utils.file_utils import ensure_directory
+    from utils.logger import get_logger
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+    from config.settings import config
+    from utils.exceptions import ConfigurationError
+    from utils.file_utils import ensure_directory
+    from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# 布尔型设置 key 集合：get_setting 读取时做字符串 'True'/'False' → bool 归一（向后兼容旧文件）
+_BOOL_KEYS = frozenset({
+    'auto_upload_screenshot', 'delete_screenshot', 'do_get_thumbnail',
+    'enable_api', 'make_dir', 'media_info_suffix', 'open_auto_feed_link',
+    'paste_screenshot_url', 'rename_file', 'create_hard_link',
+    'second_confirm_file_name', 'auto_download_upload_poster',
+})
 
 
 class SettingsManager:
@@ -40,7 +59,7 @@ class SettingsManager:
         return {
             # API Configuration
             "api_port": "15372",
-            "enable_api": "True",
+            "enable_api": True,
             # PT-Gen Configuration
             "pt_gen_api_url": "https://pt-gen.hares.dpdns.org/api/getData",
             "pt_gen_api_url_backup": "https://ptgen.agsvpt.work/",
@@ -54,22 +73,22 @@ class SettingsManager:
             "screenshot_threshold": "30.0",
             "screenshot_start_percentage": "0.10",
             "screenshot_end_percentage": "0.90",
-            "auto_upload_screenshot": "True",
-            "paste_screenshot_url": "True",
-            "delete_screenshot": "True",
-            "auto_download_upload_poster": "False",
+            "auto_upload_screenshot": True,
+            "paste_screenshot_url": True,
+            "delete_screenshot": True,
+            "auto_download_upload_poster": False,
             # Thumbnail settings
-            "do_get_thumbnail": "True",
+            "do_get_thumbnail": True,
             "thumbnail_rows": "3",
             "thumbnail_cols": "3",
             "thumbnail_delay": "2.0",
             # File management
             "torrent_storage_path": "temp/torrent",
-            "media_info_suffix": "True",
-            "make_dir": "True",
-            "rename_file": "True",
-            "create_hard_link": "True",
-            "second_confirm_file_name": "True",
+            "media_info_suffix": True,
+            "make_dir": True,
+            "rename_file": True,
+            "create_hard_link": True,
+            "second_confirm_file_name": True,
             # Naming templates - Movies
             "main_title_movie": "{en_title} {year} {video_format} {source} {video_codec} {bit_depth} {hdr_format} {frame_rate} {audio_codec} {channels} {audio_num}-{team}",
             "second_title_movie": "{original_title} / {other_titles} | 类型：{categories} | 演员：{actors}",
@@ -84,7 +103,7 @@ class SettingsManager:
             "file_name_playlet": "{original_title}.{en_title}.S{season}E{episode}.{year}.{video_format}.{source}.{video_codec}.{bit_depth}.{hdr_format}.{frame_rate}.{audio_codec}.{channels}.{audio_num}-{team}",
             # Auto feed configuration
             "auto_feed_link": "https://example.com/upload.php#separator#name#linkstr#{主标题}#linkstr#small_descr#linkstr#{副标题}#linkstr#url#linkstr#{IMDB}#linkstr#dburl#linkstr#{豆瓣}#linkstr#descr#linkstr#{简介}[quote]{MediaInfo}[/quote]#linkstr#log_info#linkstr##linkstr#tracklist#linkstr##linkstr#music_type#linkstr##linkstr#music_media#linkstr##linkstr#edition_info#linkstr##linkstr#music_name#linkstr##linkstr#music_author#linkstr##linkstr#animate_info#linkstr##linkstr#anidb#linkstr##linkstr#torrentName#linkstr##linkstr#images#linkstr##linkstr#torrent_name#linkstr#{种子名称}#linkstr#torrent_url#linkstr#{种子链接}#linkstr#type#linkstr#{类型}#linkstr#source_sel#linkstr#{地区}#linkstr#standard_sel#linkstr#{分辨率}#linkstr#audiocodec_sel#linkstr#{音频编码}#linkstr#codec_sel#linkstr#{视频编码}#linkstr#medium_sel#linkstr#{媒介}#linkstr#origin_site#linkstr#{小组}#linkstr#origin_url#linkstr##linkstr#golden_torrent#linkstr#false#linkstr#mediainfo_cmct#linkstr##linkstr#imgs_cmct#linkstr##linkstr#full_mediainfo#linkstr##linkstr#subtitles#linkstr##linkstr#youtube_url#linkstr##linkstr#ptp_poster#linkstr##linkstr#comparisons#linkstr##linkstr#version_info#linkstr##linkstr#multi_mediainfo#linkstr##linkstr#labels#linkstr#0",
-            "open_auto_feed_link": "True",
+            "open_auto_feed_link": True,
             # Personal signature
             "personalized_signature": "",
         }
@@ -139,6 +158,10 @@ class SettingsManager:
 
         # Handle legacy key compatibility
         value = self._handle_legacy_keys(value)
+
+        # 布尔归一：布尔型 key 若以字符串 'True'/'False' 存储（旧格式），归一为真 bool
+        if key in _BOOL_KEYS and isinstance(value, str):
+            value = value.lower() == 'true'
 
         logger.debug(f"Retrieved setting {key}: {value}")
         return value
