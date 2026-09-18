@@ -1,5 +1,9 @@
 # Publish Helper 2.0
 
+## ⚠ 重点声明
+
+本工具仅授权用于资源整理和发布，拒绝洗种盗种，共同维护健康绿色的网络环境！
+
 > 🚀 **现代化PT资源发布助手** - 重构版本
 
 [![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
