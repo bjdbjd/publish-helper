@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from pymediainfo import MediaInfo
 
-from src.core.tool import get_settings, get_abbreviation, chinese_to_int
+from src.core.tool import get_settings, get_abbreviation, chinese_to_int, MIN_WIDTHS
 
 
 # 从PT-Gen响应中读取关键数据
@@ -365,15 +365,8 @@ def approximate_resolution_by_width(width: int) -> str:
 
 # 从json读取分段分辨率简写信息
 def load_min_widths_from_json(filepath: str = 'static/abbreviation.json') -> Dict[int, str]:
-    default_min_widths = {
-        '9600': '8640p',
-        '4608': '4320p',
-        '3200': '2160p',
-        '2240': '1440p',
-        '1600': '1080p',
-        '900': '720p',
-        '533': '480p'
-    }
+    # 默认分辨率表共用 tool.MIN_WIDTHS（键为字符串），返回时统一转 int 键
+    default_min_widths = MIN_WIDTHS
 
     # 尝试读取文件，检查是否存在 'min_widths' 键
     try:

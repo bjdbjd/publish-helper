@@ -23,6 +23,18 @@ from src.core.settings_tool import (
 # 视频文件扩展名（统一常量，供 check_path_and_find_video / get_video_files 复用）
 VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.avi', '.flv', '.mkv', '.mpeg', '.mpg', '.rm', '.rmvb', '.ts', '.m2ts']
 
+# 分辨率分段表：宽度阈值 -> 分辨率简称。tool.get_abbreviation 与 rename.load_min_widths_from_json 共用，
+# 避免两处定义漂移（阈值单位为像素）。
+MIN_WIDTHS = {
+    '9600': '8640p',
+    '4608': '4320p',
+    '3200': '2160p',
+    '2240': '1440p',
+    '1600': '1080p',
+    '900': '720p',
+    '533': '480p',
+}
+
 
 # 写一个方法，取当前工程工作目录与传入的目录，组合成一个新的目录
 # 项目里被 API（拼 media/temp 路径）及 get_combo_box_data/get_abbreviation 使用。
@@ -258,15 +270,7 @@ def get_abbreviation(original_name: str, json_file_path: str = 'static/abbreviat
         # Check if the file exists; if not, create it with default data
         if not os.path.exists(json_file_path):
             default_data = {
-                'min_widths': {
-                    '9600': '8640p',
-                    '4608': '4320p',
-                    '3200': '2160p',
-                    '2240': '1440p',
-                    '1600': '1080p',
-                    '900': '720p',
-                    '533': '480p'
-                },
+                'min_widths': MIN_WIDTHS,
                 '7 680 pixels': '4320p',
                 '3 840 pixels': '2160p',
                 '2 560 pixels': '1440p',

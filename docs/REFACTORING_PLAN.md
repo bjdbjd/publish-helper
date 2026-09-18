@@ -90,11 +90,13 @@ return send_file(str(target_path), as_attachment=True)
 
 ## 四、实施步骤
 
-### 阶段 0：把本计划固化到仓库（首个交付物）
+> 进度标记：✅ 已完成（有对应 commit）｜⬜ 待做
+
+### 阶段 0：把本计划固化到仓库（✅ 已完成 → 6ca2239）
 
 产出 `docs/REFACTORING_PLAN.md`（本文档），作为跨会话持久参考。提交风格按仓库中文 `[docs]:[...]`。
 
-### 阶段 1：settings 系统合并（核心）
+### 阶段 1：settings 系统合并（✅ 已完成 → 94a9a6c）
 
 **1.1** `src/core/settings_tool.py`：
 - 加 D1 导入兼容桥。
@@ -113,19 +115,19 @@ return send_file(str(target_path), as_attachment=True)
 
 **1.3 验证**：`get_settings('rename_file')` 读取与改前一致；`_new` 与旧入口都能启动。
 
-### 阶段 2：布尔化 + 类型注解
+### 阶段 2：布尔化 + 类型注解（✅ 已完成 → 515ff17 / d1b8649）
 
 **2.1** 布尔化（D3）：`_get_default_settings` 用真 bool；28 处 `== 'True'` 改 truthy（分布：`startgui.py` ~15、`main_cli.py` ~10、`startapi.py` ~3）。
 **2.2** 类型注解：`tool.py` 28 函数、`rename.py` 10 函数。优先高价值：`check_path_and_find_video`、`get_data_from_pt_gen_description`、`get_pt_gen_info`、`get_name_from_template`（16 参）、`make_torrent`、`create_hard_link`。**本轮不引入 Enum**（改 25+ 调用点，属「拆分巨型」阶段）。
 **2.3 验证**：`mypy src/core/` 无 `disallow_untyped_defs` 报错；`pytest tests/ -q` 通过。
 
-### 阶段 3：抽公共常量 + 去重
+### 阶段 3：抽公共常量 + 去重（3.1 ✅ / 3.2 ✅ 已合并；3.3 ⬜ 待做）
 
-**3.1** `video_extensions`（tool.py 503、662 两处）→ 模块级 `VIDEO_EXTENSIONS`。
-**3.2** 分辨率表 `min_widths`（tool.py `get_abbreviation` 422-430 与 rename.py `load_min_widths_from_json` 363-371 两处）→ 收敛一处。
-**3.3** JSON 初始化模式（`get_settings`/`get_combo_box_data`/`get_abbreviation` 重复 3 次）→ 抽 `load_or_initialize_json(path, defaults)` 放 `utils/file_utils.py`。
+**3.1** ✅ `video_extensions`（tool.py 503、662 两处）→ 模块级 `VIDEO_EXTENSIONS`（见阶段 2.2 提交）。
+**3.2** ✅ 分辨率表 → 收敛到 `tool.MIN_WIDTHS` 常量，`get_abbreviation` 与 `load_min_widths_from_json` 共用（见阶段 3 提交）。
+**3.3** ⬜ JSON 初始化模式（`get_settings`/`get_combo_box_data`/`get_abbreviation` 重复 3 次）→ 抽 `load_or_initialize_json(path, defaults)` 放 `utils/file_utils.py`。
 
-### 阶段 4：`/api/getFile` 鉴权加固（D4）
+### 阶段 4：`/api/getFile` 鉴权加固（✅ 已完成 → 54eab95）
 
 修改 `src/api/startapi.py:1640-1683` 的 `api_get_file`。验证负面用例全被拒。
 
