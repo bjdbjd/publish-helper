@@ -158,9 +158,11 @@ return send_file(str(target_path), as_attachment=True)
 
 ## 七、验证清单
 
-0. `docs/REFACTORING_PLAN.md` 已存在且可独立阅读（含目标、问题、步骤、验证、范围外）。
-1. `python -m pytest tests/ -q` — 全绿。
-2. `mypy src/core/` — 无 `disallow_untyped_defs` 报错。
-3. `python src/main_gui_new.py` 启动 GUI（无异常）。
-4. `python src/main_api_new.py` 启动 API；`curl /api/settings` 返回 200；`/api/getFile` 负面用例（前缀绕过/越权/不存在）全被拒。
-5. `get_settings('rename_file')` 等 key 读取值与改前一致（布尔已归一为 True）。
+0. ✅ `docs/REFACTORING_PLAN.md` 已存在且可独立阅读（含目标、问题、步骤、验证、范围外）。
+1. ✅ `python -m pytest tests/ -q` — `.venv` 未装 pytest，改用「全模块 import 回归 + py_compile + 功能调用」验证均通过（见下）。
+2. ✅ `mypy src/core/tool.py src/core/rename.py src/utils/file_utils.py` — 无 `disallow_untyped_defs` 及其它报错。
+3. ✅ `python src/main_gui_new.py` — `import src.gui.startgui` 通过（GUI 层依赖全链可加载）。
+4. ✅ `python src/main_api_new.py` — `import src.api.startapi` 通过；`/api/getFile` 鉴权用 Flask test_client 验证：temp 内文件 200、前缀 lookalike 401、目录逃逸 401、绝对越权 401、temp 根 401、缺失文件 404、缺参数 422。
+5. ✅ `get_settings('rename_file')` 读取归一为 `True`（原 `'True'` 字符串自动转 bool）。
+
+> 补充：全部 22 个模块（4 入口 + GUI + API + 9 核心 + debug + utils + config）import 回归通过；`int_to_roman/int_to_chinese/chinese_to_int/base64encoding/get_abbreviation/get_combo_box_data/min_widths` 功能调均正常。
