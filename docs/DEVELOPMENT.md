@@ -11,7 +11,8 @@ publish-helper/
 │   ├── config/            # 配置模块
 │   ├── utils/             # 工具模块
 │   ├── main_gui.py        # GUI入口点
-│   └── main_api.py        # API入口点
+│   ├── main_api.py        # API入口点
+│   └── main_cli.py        # CLI入口点（交互式命令行）
 ├── tests/                 # 测试代码
 ├── docs/                  # 文档
 ├── static/                # 静态资源
@@ -108,7 +109,20 @@ make run-gui
 
 # 运行API版本
 make run-api
+
+# 运行CLI版本（交互式命令行）
+make run-cli
 ```
+
+也可以直接用对应入口脚本启动：
+
+```bash
+python src/main_gui.py    # GUI
+python src/main_api.py    # API
+python src/main_cli.py    # CLI
+```
+
+三个入口均自包含：基于 `Path(__file__)` 自举项目根与 `src/` 到 `sys.path`，无论从哪个工作目录都能启动。
 
 ## 架构设计
 

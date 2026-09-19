@@ -100,8 +100,11 @@ fc-cache -f -v
 # GUI模式
 python src/main_gui.py
 
-# API模式  
+# API模式
 python src/main_api.py
+
+# CLI模式（交互式命令行）
+python src/main_cli.py
 ```
 
 ### Docker部署
@@ -205,7 +208,8 @@ publish-helper/
 │   ├── gui/               # GUI界面
 │   ├── api/               # API接口
 │   ├── main_gui.py        # GUI入口
-│   └── main_api.py        # API入口
+│   ├── main_api.py        # API入口
+│   └── main_cli.py        # CLI入口（交互式命令行）
 ├── tests/                 # 测试代码
 ├── docs/                  # 文档
 ├── requirements.txt       # 生产依赖

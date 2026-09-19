@@ -62,6 +62,9 @@ run-gui:
 run-api:
 	python src/main_api.py
 
+run-cli:
+	python src/main_cli.py
+
 # Docker
 docker-build:
 	docker build -t publish-helper .
