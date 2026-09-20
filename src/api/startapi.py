@@ -4,6 +4,7 @@ from pathlib import Path
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+from werkzeug.datastructures import ImmutableMultiDict
 
 from src.config.settings import config
 from src.core.mediainfo import get_media_info
@@ -25,7 +26,25 @@ CORS(api)
 
 
 def start_api():
-    api.run(host='0.0.0.0', port=int(get_settings('api_port')), debug=True, use_reloader=False, threaded=True)
+    api.run(host=config.API_HOST, port=int(get_settings('api_port')), debug=config.API_DEBUG, use_reloader=False,
+            threaded=True)
+
+
+def _payload():
+    """兼容式请求载荷：JSON body 优先，其次表单，最后 URL query。
+
+    返回 werkzeug MultiDict，使各端点既有的
+    ``request.args.get(key, default, type=str)`` 调用（含 type= 转换）保持不变：
+    - JSON body：普通 dict 的 .get 不支持 type= 转换，故包成 ImmutableMultiDict；
+    - 否则回退 form / args（旧客户端以 query 传参仍然兼容）。
+    """
+    data = request.get_json(silent=True)
+    if isinstance(data, dict):
+        scalar = {k: (v if isinstance(v, str) else str(v)) for k, v in data.items()}
+        return ImmutableMultiDict(scalar)
+    if request.form:
+        return request.form
+    return request.args
 
 
 def to_camel_case(snake_str):
@@ -46,7 +65,7 @@ def convert_to_camel_case(data_class_instance):
 def api_get_screenshot():
     try:
         # 从请求URL中获取参数
-        path = request.args.get('path', default='', type=str)  # 必须信息
+        path = _payload().get('path', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         path = os.path.abspath(os.path.join(media_path, path))
 
@@ -80,20 +99,20 @@ def api_get_screenshot():
                 'statusCode': 'FILE_PATH_ERROR'
             }), 422
 
-        screenshot_storage_path = request.args.get('screenshotStoragePath',
+        screenshot_storage_path = _payload().get('screenshotStoragePath',
                                                    default=get_settings('screenshot_storage_path'), type=str)
 
         if screenshot_storage_path == '':
             screenshot_storage_path = get_settings('screenshot_storage_path')
 
-        screenshot_number = request.args.get('screenshotNumber', default=get_settings('screenshot_number'), type=str)
+        screenshot_number = _payload().get('screenshotNumber', default=get_settings('screenshot_number'), type=str)
 
         if screenshot_number == '':
             screenshot_number = int(get_settings('screenshot_number'))
         else:
             screenshot_number = int(screenshot_number)
 
-        screenshot_threshold = request.args.get('screenshotThreshold', default=get_settings('screenshot_threshold'),
+        screenshot_threshold = _payload().get('screenshotThreshold', default=get_settings('screenshot_threshold'),
                                                 type=str)
 
         if screenshot_threshold == '':
@@ -101,7 +120,7 @@ def api_get_screenshot():
         else:
             screenshot_threshold = float(screenshot_threshold)
 
-        screenshot_start_percentage = request.args.get('screenshotStartPercentage',
+        screenshot_start_percentage = _payload().get('screenshotStartPercentage',
                                                        default=get_settings('screenshot_start_percentage'), type=str)
 
         if screenshot_start_percentage == '':
@@ -109,7 +128,7 @@ def api_get_screenshot():
         else:
             screenshot_start_percentage = float(screenshot_start_percentage)
 
-        screenshot_end_percentage = request.args.get('screenshotEndPercentage',
+        screenshot_end_percentage = _payload().get('screenshotEndPercentage',
                                                      default=get_settings('screenshot_end_percentage'), type=str)
 
         if screenshot_end_percentage == '':
@@ -117,7 +136,7 @@ def api_get_screenshot():
         else:
             screenshot_end_percentage = float(screenshot_end_percentage)
 
-        screenshot_min_interval_percentage = request.args.get('screenshotMinIntervalPercentage', default='0.01',
+        screenshot_min_interval_percentage = _payload().get('screenshotMinIntervalPercentage', default='0.01',
                                                               type=str)
 
         if screenshot_min_interval_percentage == '':
@@ -229,7 +248,7 @@ def api_get_screenshot():
 def api_get_thumbnail():
     try:
         # 从请求URL中获取参数
-        path = request.args.get('path', default='', type=str)  # 必须信息
+        path = _payload().get('path', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         path = os.path.abspath(os.path.join(media_path, path))
 
@@ -261,32 +280,32 @@ def api_get_thumbnail():
                 'statusCode': 'FILE_PATH_ERROR'
             }), 422
 
-        screenshot_storage_path = request.args.get('screenshotStoragePath',
+        screenshot_storage_path = _payload().get('screenshotStoragePath',
                                                    default=get_settings('screenshot_storage_path'), type=str)
 
         if screenshot_storage_path == '':
             screenshot_storage_path = get_settings('screenshot_storage_path')
 
-        thumbnail_rows = request.args.get('thumbnailRows', default=get_settings('thumbnail_rows'), type=str)
+        thumbnail_rows = _payload().get('thumbnailRows', default=get_settings('thumbnail_rows'), type=str)
         if thumbnail_rows == '':
             thumbnail_rows = int(get_settings('thumbnail_rows'))
         else:
             thumbnail_rows = int(thumbnail_rows)
 
-        thumbnail_cols = request.args.get('thumbnailCols', default=get_settings('thumbnail_cols'), type=str)
+        thumbnail_cols = _payload().get('thumbnailCols', default=get_settings('thumbnail_cols'), type=str)
         if thumbnail_cols == '':
             thumbnail_cols = int(get_settings('thumbnail_cols'))
         else:
             thumbnail_cols = int(thumbnail_cols)
 
-        screenshot_start_percentage = request.args.get('screenshotStartPercentage',
+        screenshot_start_percentage = _payload().get('screenshotStartPercentage',
                                                        default=get_settings('screenshot_start_percentage'), type=str)
         if screenshot_start_percentage == '':
             screenshot_start_percentage = float(get_settings('screenshot_start_percentage'))
         else:
             screenshot_start_percentage = float(screenshot_start_percentage)
 
-        screenshot_end_percentage = request.args.get('screenshotEndPercentage',
+        screenshot_end_percentage = _payload().get('screenshotEndPercentage',
                                                      default=get_settings('screenshot_end_percentage'), type=str)
         if screenshot_end_percentage == '':
             screenshot_end_percentage = float(get_settings('screenshot_end_percentage'))
@@ -375,7 +394,7 @@ def api_get_thumbnail():
 def api_upload_picture():
     try:
         # 从请求URL中获取参数
-        picture_path = request.args.get('picturePath', default='', type=str)  # 必须信息
+        picture_path = _payload().get('picturePath', default='', type=str)  # 必须信息
         if picture_path == '':
             return jsonify({
                 'data': {
@@ -395,12 +414,12 @@ def api_upload_picture():
                 'statusCode': 'FILE_PATH_ERROR'
             }), 422
 
-        picture_bed_api_url = request.args.get('pictureBedApiUrl', default=get_settings('picture_bed_api_url'),
+        picture_bed_api_url = _payload().get('pictureBedApiUrl', default=get_settings('picture_bed_api_url'),
                                                type=str)
         if picture_bed_api_url == '':
             picture_bed_api_url = get_settings('picture_bed_api_url')
 
-        picture_bed_api_token = request.args.get('pictureBedApiToken', default=get_settings('picture_bed_api_token'),
+        picture_bed_api_token = _payload().get('pictureBedApiToken', default=get_settings('picture_bed_api_token'),
                                                  type=str)
         if picture_bed_api_token == '':
             picture_bed_api_token = get_settings('picture_bed_api_token')
@@ -441,7 +460,7 @@ def api_upload_picture():
 def api_get_media_info():
     try:
         # 从请求URL中获取path
-        path = request.args.get('path', default='', type=str)  # 必须信息
+        path = _payload().get('path', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         path = os.path.abspath(os.path.join(media_path, path))
         # 为了安全，确认绝对路径media目录
@@ -519,7 +538,7 @@ def api_get_media_info():
 def api_get_video_info():
     try:
         # 从请求URL中获取path
-        path = request.args.get('path', default='', type=str)  # 必须信息
+        path = _payload().get('path', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         path = os.path.abspath(os.path.join(media_path, path))
         # 为了安全，确认绝对路径media目录
@@ -647,7 +666,7 @@ def api_get_video_info():
 def api_get_pt_gen_description():
     try:
         # 从请求URL中获取参数
-        resource_url = request.args.get('resourceUrl', default='', type=str)  # 必须信息
+        resource_url = _payload().get('resourceUrl', default='', type=str)  # 必须信息
 
         if resource_url == '':
             return jsonify({
@@ -658,7 +677,7 @@ def api_get_pt_gen_description():
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
             }), 422
 
-        pt_gen_api_url = request.args.get('ptGenApiUrl', default=get_settings('pt_gen_api_url'), type=str)
+        pt_gen_api_url = _payload().get('ptGenApiUrl', default=get_settings('pt_gen_api_url'), type=str)
         if pt_gen_api_url == '':
             pt_gen_api_url = get_settings('pt_gen_api_url')
 
@@ -724,7 +743,7 @@ def api_get_pt_gen_description():
 # 用于获取短剧简介
 def api_get_playlet_description():
     try:
-        original_title = request.args.get('originalTitle', default='', type=str)  # 必须信息
+        original_title = _payload().get('originalTitle', default='', type=str)  # 必须信息
 
         if original_title == '':
             return jsonify({
@@ -735,11 +754,11 @@ def api_get_playlet_description():
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
             }), 422
 
-        year = request.args.get('year', default='', type=str)
-        area = request.args.get('area', default='', type=str)
-        category = request.args.get('category', default='', type=str)
-        language = request.args.get('language', default='', type=str)
-        season_number = request.args.get('seasonNumber', default='', type=str)
+        year = _payload().get('year', default='', type=str)
+        area = _payload().get('area', default='', type=str)
+        category = _payload().get('category', default='', type=str)
+        language = _payload().get('language', default='', type=str)
+        season_number = _payload().get('seasonNumber', default='', type=str)
         playlet_description = get_playlet_description(original_title, year, area, category, language, season_number)
         return jsonify({
             'data': {
@@ -763,7 +782,7 @@ def api_get_playlet_description():
 def api_get_pt_gen_info():
     try:
         # 从请求URL中获取参数
-        description = request.args.get('description', default='', type=str)  # 必须信息
+        description = _payload().get('description', default='', type=str)  # 必须信息
         if description == '':
             return jsonify({
                 'data': {
@@ -830,7 +849,7 @@ def api_get_pt_gen_info():
 def api_make_torrent():
     try:
         # 从请求URL中获取参数
-        path = request.args.get('path', default='', type=str)  # 必须信息
+        path = _payload().get('path', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         path = os.path.abspath(os.path.join(media_path, path))
 
@@ -860,7 +879,7 @@ def api_make_torrent():
                 'statusCode': 'FILE_PATH_ERROR'
             }), 422
 
-        torrent_storage_path = request.args.get('torrentStoragePath', default=get_settings('torrent_storage_path'),
+        torrent_storage_path = _payload().get('torrentStoragePath', default=get_settings('torrent_storage_path'),
                                                 type=str)
         if torrent_storage_path == '':
             torrent_storage_path = get_settings('torrent_storage_path')
@@ -897,7 +916,7 @@ def api_make_torrent():
 def api_get_name_from_template():
     try:
         # 从请求URL中获取参数
-        template = request.args.get('template', default='', type=str)  # 必须信息
+        template = _payload().get('template', default='', type=str)  # 必须信息
 
         if template == '':
             return jsonify({
@@ -917,27 +936,27 @@ def api_get_name_from_template():
                 'statusCode': 'PARAMETER_RANGE_ERROR'
             }), 422
 
-        english_title = request.args.get('englishTitle', default='', type=str)
-        original_title = request.args.get('originalTitle', default='', type=str)
-        season = request.args.get('season', default='', type=str)
-        # episode = request.args.get('episode', default='', type=str)  # Currently unused
-        year = request.args.get('year', default='', type=str)
-        video_format = request.args.get('videoFormat', default='', type=str)
-        source = request.args.get('source', default='', type=str)
-        video_codec = request.args.get('videoCodec', default='', type=str)
-        bit_depth = request.args.get('bitDepth', default='', type=str)
-        hdr_format = request.args.get('hdrFormat', default='', type=str)
-        frame_rate = request.args.get('frameRate', default='', type=str)
-        audio_codec = request.args.get('audioCodec', default='', type=str)
-        channels = request.args.get('channels', default='', type=str)
-        audio_num = request.args.get('audioNum', default='', type=str)
-        team = request.args.get('team', default='', type=str)
-        other_titles = request.args.get('otherTitles', default='', type=str)
-        season_number = request.args.get('seasonNumber', default='', type=str)
-        total_episode = request.args.get('totalEpisode', default='', type=str)
-        playlet_source = request.args.get('playletSource', default='', type=str)
-        category = request.args.get('category', default='', type=str)
-        actors = request.args.get('actors', default='', type=str)
+        english_title = _payload().get('englishTitle', default='', type=str)
+        original_title = _payload().get('originalTitle', default='', type=str)
+        season = _payload().get('season', default='', type=str)
+        # episode = _payload().get('episode', default='', type=str)  # Currently unused
+        year = _payload().get('year', default='', type=str)
+        video_format = _payload().get('videoFormat', default='', type=str)
+        source = _payload().get('source', default='', type=str)
+        video_codec = _payload().get('videoCodec', default='', type=str)
+        bit_depth = _payload().get('bitDepth', default='', type=str)
+        hdr_format = _payload().get('hdrFormat', default='', type=str)
+        frame_rate = _payload().get('frameRate', default='', type=str)
+        audio_codec = _payload().get('audioCodec', default='', type=str)
+        channels = _payload().get('channels', default='', type=str)
+        audio_num = _payload().get('audioNum', default='', type=str)
+        team = _payload().get('team', default='', type=str)
+        other_titles = _payload().get('otherTitles', default='', type=str)
+        season_number = _payload().get('seasonNumber', default='', type=str)
+        total_episode = _payload().get('totalEpisode', default='', type=str)
+        playlet_source = _payload().get('playletSource', default='', type=str)
+        category = _payload().get('category', default='', type=str)
+        actors = _payload().get('actors', default='', type=str)
         english_title = delete_season_number(english_title, season_number)
 
         name = get_name_from_template(english_title, original_title, season, '{集数}', year, video_format,
@@ -967,7 +986,7 @@ def api_get_name_from_template():
 def api_rename_folder():
     try:
         # 从请求URL中获取参数
-        folder_path = request.args.get('folderPath', default='', type=str)  # 必须信息
+        folder_path = _payload().get('folderPath', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         folder_path = os.path.abspath(os.path.join(media_path, folder_path))
         # 为保证安全，确认绝对路径为media目录
@@ -991,7 +1010,7 @@ def api_rename_folder():
                 'statusCode': 'FILE_PATH_ERROR'
             }), 422
 
-        new_folder_name = request.args.get('newFolderName', default='', type=str)  # 必须信息
+        new_folder_name = _payload().get('newFolderName', default='', type=str)  # 必须信息
 
         if new_folder_name == '':
             return jsonify({
@@ -1029,7 +1048,7 @@ def api_rename_folder():
 def api_rename_file():
     try:
         # 从请求URL中获取参数
-        file_path = request.args.get('filePath', default='', type=str)  # 必须信息
+        file_path = _payload().get('filePath', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         file_path = os.path.abspath(os.path.join(media_path, file_path))
 
@@ -1059,7 +1078,7 @@ def api_rename_file():
                 'statusCode': 'FILE_PATH_ERROR'
             }), 422
 
-        new_file_name = request.args.get('newFileName', default='', type=str)  # 必须信息
+        new_file_name = _payload().get('newFileName', default='', type=str)  # 必须信息
 
         if new_file_name == '':
             return jsonify({
@@ -1103,7 +1122,7 @@ def api_rename_file():
 def api_create_hard_link():
     try:
         # 从请求URL中获取参数
-        path = request.args.get('path', default='', type=str)  # 必须信息
+        path = _payload().get('path', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         path = os.path.abspath(os.path.join(media_path, path))
 
@@ -1166,7 +1185,7 @@ def api_create_hard_link():
 def api_move_file_to_folder():
     try:
         # 从请求URL中获取参数
-        path = request.args.get('filePath', default='', type=str)  # 必须信息
+        path = _payload().get('filePath', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         file_path = os.path.abspath(os.path.join(media_path, path))
 
@@ -1196,7 +1215,7 @@ def api_move_file_to_folder():
                 'statusCode': 'FILE_PATH_ERROR'
             }), 422
 
-        folder_name = request.args.get('folderName', default='', type=str)  # 必须信息
+        folder_name = _payload().get('folderName', default='', type=str)  # 必须信息
 
         if folder_name == '':
             return jsonify({
@@ -1240,7 +1259,7 @@ def api_move_file_to_folder():
 def api_rename_episode():
     try:
         # 从请求URL中获取参数
-        folder_path = request.args.get('folderPath', default='', type=str)  # 必须信息
+        folder_path = _payload().get('folderPath', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         folder_path = os.path.abspath(os.path.join(media_path, folder_path))
 
@@ -1270,7 +1289,7 @@ def api_rename_episode():
                 'statusCode': 'FILE_PATH_ERROR'
             }), 422
 
-        new_file_name = request.args.get('newFileName', default='', type=str)  # 必须信息
+        new_file_name = _payload().get('newFileName', default='', type=str)  # 必须信息
 
         if new_file_name == '':
             return jsonify({
@@ -1281,7 +1300,7 @@ def api_rename_episode():
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
             }), 422
 
-        episode_start_number = request.args.get('episodeStartNumber', default='', type=str)  # 必须信息
+        episode_start_number = _payload().get('episodeStartNumber', default='', type=str)  # 必须信息
 
         if episode_start_number == '' or episode_start_number == '':
             episode_start_number = '1'
@@ -1373,7 +1392,7 @@ def api_rename_episode():
 def api_get_total_episode():
     try:
         # 从请求URL中获取参数
-        folder_path = request.args.get('folderPath', default='', type=str)  # 必须信息
+        folder_path = _payload().get('folderPath', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         folder_path = os.path.abspath(os.path.join(media_path, folder_path))
 
@@ -1403,7 +1422,7 @@ def api_get_total_episode():
                 'statusCode': 'FILE_PATH_ERROR'
             }), 422
 
-        episode_start_number = request.args.get('episodeStartNumber', default='', type=str)
+        episode_start_number = _payload().get('episodeStartNumber', default='', type=str)
 
         if episode_start_number == '' or episode_start_number == '':
             episode_start_number = '1'
@@ -1473,7 +1492,7 @@ def api_get_total_episode():
 def api_get_combo_box_data():
     try:
         # 从请求URL中获取参数
-        configuration_name = request.args.get('configurationName', default='', type=str)  # 必须信息
+        configuration_name = _payload().get('configurationName', default='', type=str)  # 必须信息
 
         if configuration_name == '':
             return jsonify({
@@ -1525,7 +1544,7 @@ def api_get_combo_box_data():
 def api_update_combo_box_data():
     try:
         # 从请求URL中获取参数
-        configuration_name = request.args.get('configurationName', default='', type=str)  # 必须信息
+        configuration_name = _payload().get('configurationName', default='', type=str)  # 必须信息
 
         if configuration_name == '':
             return jsonify({
@@ -1541,7 +1560,7 @@ def api_update_combo_box_data():
                 'statusCode': 'PARAMETER_RANGE_ERROR'
             }), 422
 
-        configuration_data = request.args.get('configurationData', default='', type=str)  # 必须信息
+        configuration_data = _payload().get('configurationData', default='', type=str)  # 必须信息
 
         if configuration_data == '':
             return jsonify({
@@ -1576,7 +1595,7 @@ def api_update_combo_box_data():
 def api_get_settings():
     try:
         # 从请求URL中获取参数
-        settings_name = request.args.get('settingsName', default='', type=str)  # 必须信息
+        settings_name = _payload().get('settingsName', default='', type=str)  # 必须信息
 
         if settings_name == '':
             return jsonify({
@@ -1610,7 +1629,7 @@ def api_get_settings():
 def api_update_settings():
     try:
         # 从请求URL中获取参数
-        settings_name = request.args.get('settingsName', default='', type=str)  # 必须信息
+        settings_name = _payload().get('settingsName', default='', type=str)  # 必须信息
 
         if settings_name == '':
             return jsonify({
@@ -1619,7 +1638,7 @@ def api_update_settings():
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
             }), 422
 
-        settings_data = request.args.get('settingsData', default='', type=str)  # 必须信息
+        settings_data = _payload().get('settingsData', default='', type=str)  # 必须信息
 
         if settings_data == '':
             return jsonify({
@@ -1647,7 +1666,7 @@ def api_update_settings():
 def api_get_file():
     try:
         # 从请求参数中获取文件路径
-        file_path = request.args.get('filePath', default='', type=str)  # 获取文件路径
+        file_path = _payload().get('filePath', default='', type=str)  # 获取文件路径
 
         # 检查文件路径参数是否已提供
         if file_path == '':
@@ -1739,7 +1758,7 @@ def api_settings_update():
 def api_get_pt_gen_info_by_url():
     try:
         # 从请求URL中获取参数
-        resource_url = request.args.get('resourceUrl', default='', type=str)  # 必须信息
+        resource_url = _payload().get('resourceUrl', default='', type=str)  # 必须信息
         if resource_url == '':
             return jsonify({
                 'data': {
@@ -1749,7 +1768,7 @@ def api_get_pt_gen_info_by_url():
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
             }), 422
 
-        pt_gen_api_url = request.args.get('ptGenApiUrl', default=get_settings('pt_gen_api_url'), type=str)
+        pt_gen_api_url = _payload().get('ptGenApiUrl', default=get_settings('pt_gen_api_url'), type=str)
         if pt_gen_api_url == '':
             pt_gen_api_url = get_settings('pt_gen_api_url')
 
@@ -1812,7 +1831,7 @@ def api_get_pt_gen_info_by_url():
 def api_medis_path():
     try:
         # 从请求URL中获取参数
-        path = request.args.get('path', default='', type=str)  # 必须信息
+        path = _payload().get('path', default='', type=str)  # 必须信息
         media_path = combine_directories('media')
         target_path = os.path.abspath(os.path.join(media_path, path))
         # 确认绝对路径为temp目录即可
@@ -1895,13 +1914,13 @@ def convert_size(size_bytes):
 # 用于获取MediaInfo，传入一个文件地址或者一个文件夹地址，返回视频文件路径和MediaInfo
 def api_auto_handle_movie():
     try:
-        resource_url = request.args.get('resourceUrl', default='', type=str)  # 必须信息
-        path = request.args.get('path', default='', type=str)  # 必须信息
-        source = request.args.get('source', default='', type=str)  # 必须信息
-        team = request.args.get('team', default='', type=str)  # 必须信息
-        category = request.args.get('category', default='', type=str)  # 必须信息
-        season = request.args.get('season', default='1', type=str)
-        episodes_start_number = request.args.get('episodesStartNumber', default='1', type=str)
+        resource_url = _payload().get('resourceUrl', default='', type=str)  # 必须信息
+        path = _payload().get('path', default='', type=str)  # 必须信息
+        source = _payload().get('source', default='', type=str)  # 必须信息
+        team = _payload().get('team', default='', type=str)  # 必须信息
+        category = _payload().get('category', default='', type=str)  # 必须信息
+        season = _payload().get('season', default='1', type=str)
+        episodes_start_number = _payload().get('episodesStartNumber', default='1', type=str)
 
         if season == '':
             season = '1'
