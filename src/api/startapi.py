@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass, asdict
 from pathlib import Path
+from typing import List
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -2081,7 +2082,7 @@ def api_auto_handle_movie():
             '''来源'''
             source: str
             '''标签，部分可识别的标签'''
-            tags: []
+            tags: List[str]
             '''小组'''
             team: str
             '''种子文件'''
@@ -2299,10 +2300,10 @@ def api_auto_handle_movie():
 
         other_titles = other_titles[: -3]
 
-        # 给个位数的季数前面补0
-        season_number = season
-        if len(season) < 2:
-            season = '0' + season
+        # 给个位数的季数前面补0（season 来自 get_pt_gen_info，类型 Optional[int]，先转 str 再补）
+        season_number = str(season) if season is not None else ''
+        if len(season_number) < 2 and season_number:
+            season = '0' + season_number
 
         # 获取total_episode
         total_episodes = ''
