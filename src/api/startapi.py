@@ -20,9 +20,18 @@ from src.core.text import validate_and_convert_to_int
 from src.core.torrent import make_torrent
 from src.core.video import check_path_and_find_video, delete_season_number, get_video_files
 from src.utils.file_utils import combine_directories
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 api = Flask(__name__)
 CORS(api)
+
+
+def _log(*args):
+    """将历史 ``_log(...)`` 统一改道到结构化 logger.debug，避免原始 stdout 残留调试输出。
+    兼容单参/多参（类似 print 语义），仅改变输出通道、不改业务。"""
+    logger.debug(' '.join(str(a) for a in args))
 
 
 def start_api():
@@ -587,7 +596,7 @@ def api_get_video_info():
             video_path = response
             get_video_info_success, response = get_video_info(video_path)
             if get_video_info_success:
-                print('获取到关键参数：' + str(response))
+                _log('获取到关键参数：' + str(response))
                 video_format = response[0]
                 video_codec = response[1]
                 bit_depth = response[2]
@@ -707,11 +716,11 @@ def api_get_pt_gen_description():
                     
                     if process_success:
                         poster_url = process_result
-                        print(f'Poster uploaded successfully: {poster_url}')
+                        _log(f'Poster uploaded successfully: {poster_url}')
                     else:
-                        print(f'Poster processing failed: {process_result}')
+                        _log(f'Poster processing failed: {process_result}')
                 except Exception as e:
-                    print(f'Error processing poster: {e}')
+                    _log(f'Error processing poster: {e}')
             
             return jsonify({
                 'data': {
@@ -799,7 +808,7 @@ def api_get_pt_gen_info():
 
         original_title, english_title, year, other_names_sorted, category, actors_list, episodes, season = get_pt_gen_info(
             description)
-        print(original_title, english_title, year, other_names_sorted, category, actors_list)
+        _log(original_title, english_title, year, other_names_sorted, category, actors_list)
         actors = ''
         other_titles = ''
         is_first = True
@@ -963,7 +972,7 @@ def api_get_name_from_template():
                                       source, video_codec, bit_depth, hdr_format, frame_rate,
                                       audio_codec, channels, audio_num, team, other_titles, season_number,
                                       total_episode, playlet_source, category, actors, template)
-        print(f'获取到名称是{name}')
+        _log(f'获取到名称是{name}')
         return jsonify({
             'data': {
                 'name': name
@@ -1312,7 +1321,7 @@ def api_rename_episode():
             get_video_files_success, video_files = get_video_files(folder_path)  # 获取文件夹内部的所有文件
 
             if get_video_files_success:
-                print('检测到以下文件：', video_files)
+                _log('检测到以下文件：', video_files)
                 episode_start_number = int(episode_start_number)
                 episode_num = len(video_files)  # 获取视频文件的总数
                 i = episode_start_number
@@ -1334,7 +1343,7 @@ def api_rename_episode():
                     else:
                         raise OSError('重命名文件失败：' + response)
 
-                print('开始对文件夹重新命名')
+                _log('开始对文件夹重新命名')
                 rename_directory_success, response = rename_folder(os.path.dirname(video_path), new_file_name.
                                                                    replace('E{集数}', '').
                                                                    replace('{集数}', ''))
@@ -1433,7 +1442,7 @@ def api_get_total_episode():
             get_video_files_success, video_files = get_video_files(folder_path)  # 获取文件夹内部的所有文件
 
             if get_video_files_success:
-                print('检测到以下文件：', video_files)
+                _log('检测到以下文件：', video_files)
                 episode_start_number = int(episode_start_number)
                 episode_num = len(video_files)  # 获取视频文件的总数
 
@@ -1693,7 +1702,7 @@ def api_get_file():
 
         # 检查文件是否存在（且是普通文件，防止返回目录内容）
         if not target_path.is_file():
-            print(target_path)
+            _log(target_path)
             return jsonify({
                 'data': {},
                 'message': '文件未找到。',
@@ -2079,7 +2088,7 @@ def api_auto_handle_movie():
 
         # response is now (format_data, full_data)
         format_data, full_data = response
-        # print(f'获取到pt_gen响应：{format_data}')
+        # _log(f'获取到pt_gen响应：{format_data}')
         data_instance.description = format_data
 
         # 获取截图
@@ -2120,9 +2129,9 @@ def api_auto_handle_movie():
                                         if os.path.exists(picture_path):
                                             # 删除文件
                                             os.remove(picture_path)
-                                            print(f'文件 {picture_path} 已被删除。')
+                                            _log(f'文件 {picture_path} 已被删除。')
                                         else:
-                                            print(f'文件 {picture_path} 不存在。')
+                                            _log(f'文件 {picture_path} 不存在。')
                             else:
                                 raise RuntimeError(f'截图失败：{response[0]}')
                         else:
@@ -2170,9 +2179,9 @@ def api_auto_handle_movie():
                                     if os.path.exists(thumbnail_path):
                                         # 删除文件
                                         os.remove(thumbnail_path)
-                                        print(f'文件 {thumbnail_path} 已被删除。')
+                                        _log(f'文件 {thumbnail_path} 已被删除。')
                                     else:
-                                        print(f'文件 {thumbnail_path} 不存在。')
+                                        _log(f'文件 {thumbnail_path} 不存在。')
                             else:
                                 raise RuntimeError(f'生成缩略图失败：{response}')
                         else:
@@ -2192,7 +2201,7 @@ def api_auto_handle_movie():
             video_path = response
             get_video_info_success, response = get_video_info(video_path)
             if get_video_info_success:
-                print('获取到VideoInfo：' + str(response))
+                _log('获取到VideoInfo：' + str(response))
                 data_instance.video_format = response[0]
                 data_instance.video_codec = response[1]
                 data_instance.bit_depth = response[2]
@@ -2208,10 +2217,10 @@ def api_auto_handle_movie():
             raise ValueError(f'资源的路径不正确：{response}')
 
         # 获取PT-GenInfo
-        print(f'获取PT-GenInfo，从{data_instance.description}')
+        _log(f'获取PT-GenInfo，从{data_instance.description}')
         original_title, english_title, year, other_names_sorted, categories, actors_list, episodes, season = get_pt_gen_info(
             data_instance.description)
-        print(original_title, english_title, year, other_names_sorted, categories, actors_list)
+        _log(original_title, english_title, year, other_names_sorted, categories, actors_list)
         actors = ''
         other_titles = ''
         is_first = True
@@ -2244,7 +2253,7 @@ def api_auto_handle_movie():
                 get_video_files_success, video_files = get_video_files(path)  # 获取文件夹内部的所有文件
                 if get_video_files_success:
                     episodes_start_number = 1  # 默认从第一集开始
-                    print('检测到以下文件：', video_files)
+                    _log('检测到以下文件：', video_files)
                     episodes_num = len(video_files)  # 获取视频文件的总数
                     if episodes_start_number == 1 and episodes == episodes_num:
                         total_episodes = f'全{str(episodes_num)}集'
@@ -2255,7 +2264,7 @@ def api_auto_handle_movie():
                         else:
                             total_episodes = f'第{str(episodes_start_number)}-{str(episodes_start_number + episodes_num - 1)}集'
                         data_instance.tags.append('分集')
-                    print(f'总集数信息：{total_episodes}')
+                    _log(f'总集数信息：{total_episodes}')
 
                 else:
                     raise RuntimeError(f'获取文件夹内部的所有文件失败：{response[0]}')
@@ -2273,7 +2282,7 @@ def api_auto_handle_movie():
                                                           data_instance.audio_num, data_instance.team, other_titles,
                                                           season_number,
                                                           total_episodes, '', categories, actors, template)
-        print(f'获取到主标题是{data_instance.main_title}')
+        _log(f'获取到主标题是{data_instance.main_title}')
 
         # 获取副标题
         template = 'second_title_' + category.lower()
@@ -2286,7 +2295,7 @@ def api_auto_handle_movie():
                                                             data_instance.audio_num, data_instance.team, other_titles,
                                                             season_number,
                                                             total_episodes, '', categories, actors, template)
-        print(f'获取到副标题是{data_instance.second_title}')
+        _log(f'获取到副标题是{data_instance.second_title}')
 
         # 获取文件名
         template = 'file_name_' + category.lower()
@@ -2299,7 +2308,7 @@ def api_auto_handle_movie():
                                                          data_instance.audio_num, data_instance.team, other_titles,
                                                          season_number,
                                                          total_episodes, '', categories, actors, template)
-        print(f'获取到文件名是{data_instance.file_name}')
+        _log(f'获取到文件名是{data_instance.file_name}')
 
         if category == 'Movie':
             # 给文件或者文件夹重命名
@@ -2307,7 +2316,7 @@ def api_auto_handle_movie():
             if is_video_path == 1 or is_video_path == 2:
                 file_path = response
                 if is_video_path == 1:
-                    print('开始把影片资源视频塞进文件夹')
+                    _log('开始把影片资源视频塞进文件夹')
                     move_file_to_folder_success, response = move_file_to_folder(file_path, data_instance.file_name)
                     if move_file_to_folder_success:
                         file_path = response
@@ -2316,11 +2325,11 @@ def api_auto_handle_movie():
                 if is_video_path == 2:
                     folder_path = path
                     # 开始对目录重命名
-                    print('开始对影片资源目录重命名')
+                    _log('开始对影片资源目录重命名')
                     rename_success, response = rename_folder(folder_path, data_instance.file_name)
                     if rename_success:
                         new_folder_path = response
-                        print(f'新的文件夹路径：{new_folder_path}')
+                        _log(f'新的文件夹路径：{new_folder_path}')
                         is_video_path, response = check_path_and_find_video(new_folder_path)  # 视频资源的路径
                         if is_video_path == 2:
                             file_path = response
@@ -2328,16 +2337,16 @@ def api_auto_handle_movie():
                         raise RuntimeError(f'对影片资源目录重命名失败：{response}')
 
                 # 开始对文件重命名
-                print('开始对影片资源视频重命名')
+                _log('开始对影片资源视频重命名')
                 rename_success, response = rename_file(file_path, data_instance.file_name)
                 if rename_success:
                     new_file_path = response
                     if is_video_path == 1:
                         path = new_file_path
-                        print(f'重命名后的新文件路径：{path}')
+                        _log(f'重命名后的新文件路径：{path}')
                     if is_video_path == 2:
                         path = os.path.dirname(new_file_path)
-                        print(f'重命名后的新文件夹路径：{path}')
+                        _log(f'重命名后的新文件夹路径：{path}')
                 else:
                     raise RuntimeError(f'对影片资源视频重命名失败：{response}')
             else:
@@ -2348,7 +2357,7 @@ def api_auto_handle_movie():
             if is_video_path == 2:  # 视频路径是文件夹
                 get_video_files_success, video_files = get_video_files(path)  # 获取文件夹内部的所有文件
                 i = episodes_start_number
-                print('开始对剧集资源文件夹里的视频重新命名')
+                _log('开始对剧集资源文件夹里的视频重新命名')
                 for video_file in video_files:
                     e = str(i)
                     while len(e) < len(str(episodes_start_number + episodes_num - 1)):
@@ -2359,18 +2368,18 @@ def api_auto_handle_movie():
                                                                 data_instance.file_name.replace('{集数}', e))
                     if rename_file_success:
                         video_path = response
-                        print('剧集资源视频成功重新命名为：' + video_path)
+                        _log('剧集资源视频成功重新命名为：' + video_path)
                     else:
-                        print('重命名失败：' + response)
+                        _log('重命名失败：' + response)
                         raise RuntimeError('剧集资源视频重命名失败：' + response)
                     i += 1
-                print('对剧集资源文件夹重新命名')
+                _log('对剧集资源文件夹重新命名')
                 rename_directory_success, response = rename_folder(os.path.dirname(video_path), data_instance.file_name.
                                                                    replace('E{集数}', '').
                                                                    replace('{集数}', ''))
                 if rename_directory_success:
                     path = response
-                    print('剧集资源文件夹成功重新命名为：' + path)
+                    _log('剧集资源文件夹成功重新命名为：' + path)
                 else:
                     raise RuntimeError('剧集资源文件夹重命名失败：' + response)
             else:
@@ -2383,19 +2392,19 @@ def api_auto_handle_movie():
             get_media_info_success, response = get_media_info(video_path)
             if get_media_info_success:
                 data_instance.media_info = response
-                # print(f'成功获取MediaInfo：\n{data_instance.media_info}')
+                # _log(f'成功获取MediaInfo：\n{data_instance.media_info}')
             else:
                 raise RuntimeError('获取MediaInfo失败：' + response)
         else:
             raise ValueError(f'资源的路径不正确：{response}')
 
-        print('开始分析其他关键参数')
+        _log('开始分析其他关键参数')
         (data_instance.imdb_url, data_instance.douban_url, data_instance.category, data_instance.area,
          data_instance.video_format,
          data_instance.audio_codec, data_instance.video_codec, data_instance.medium) \
             = get_data_from_pt_gen_description(data_instance.main_title, data_instance.description,
                                                data_instance.media_info, data_instance.source, data_instance.category)
-        # print('获得的参数：', data_instance.main_title, data_instance.second_title, data_instance.imdb_url,
+        # _log('获得的参数：', data_instance.main_title, data_instance.second_title, data_instance.imdb_url,
         #       data_instance.douban_url, data_instance.description, data_instance.media_info, data_instance.category,
         #       data_instance.area, data_instance.video_format, data_instance.audio_codec, data_instance.video_codec,
         #       data_instance.medium, data_instance.team)
