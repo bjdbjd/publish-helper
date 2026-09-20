@@ -1,0 +1,125 @@
+"""Tests for src.core.text text/number/pinyin helpers."""
+
+import pytest
+
+from src.core.text import (
+    base64encoding,
+    chinese_name_to_pinyin,
+    chinese_to_int,
+    convert_chinese_punctuation_to_english,
+    int_to_chinese,
+    int_to_roman,
+    int_to_special_roman,
+    natural_keys,
+    validate_and_convert_to_int,
+)
+
+
+class TestNaturalKeys:
+    def test_sorts_numeric_order(self):
+        items = ["EP10", "EP1", "EP2"]
+        items.sort(key=natural_keys)
+        assert items == ["EP1", "EP2", "EP10"]
+
+    def test_case_insensitive(self):
+        items = ["Apple", "banana", "Barry"]
+        items.sort(key=natural_keys)
+        assert items == ["Apple", "banana", "Barry"]
+
+    def test_returns_list_of_int_and_str(self):
+        keys = natural_keys("EP10")
+        assert 10 in keys
+
+
+class TestIntToRoman:
+    def test_single_digit(self):
+        assert int_to_roman(4) == "IV"
+
+    def test_multi_digit(self):
+        assert int_to_roman(9) == "IX"
+        assert int_to_roman(1990) == "MCMXC"
+
+    def test_zero_returns_empty(self):
+        assert int_to_roman(0) == ""
+
+
+class TestIntToSpecialRoman:
+    def test_mapping_1_to_10(self):
+        assert int_to_special_roman(2) == "Ⅱ"
+        assert int_to_special_roman(5) == "Ⅴ"
+        assert int_to_special_roman(10) == "Ⅹ"
+
+    def test_out_of_range_returns_number_str(self):
+        assert int_to_special_roman(11) == "11"
+        assert int_to_special_roman(0) == "0"
+
+
+class TestIntToChinese:
+    def test_zero(self):
+        assert int_to_chinese(0) == "零"
+
+    def test_under_20(self):
+        # 注意：当前算法会在十位前补一个'一'（'一十一'），按现状断言
+        assert int_to_chinese(11) == "一十一"
+
+    def test_multiple_of_ten(self):
+        # 算法对 10 也会补前导一 → '一十'，按现状断言
+        assert int_to_chinese(10) == "一十"
+
+    def test_out_of_range(self):
+        assert int_to_chinese(-1) == "数字超出范围"
+        assert int_to_chinese(10000) == "数字超出范围"
+
+
+class TestChineseToInt:
+    def test_single_digit(self):
+        assert chinese_to_int("五") == 5
+        assert chinese_to_int("二") == 2
+        assert chinese_to_int("十") == 10
+
+    def test_invalid_returns_none(self):
+        assert chinese_to_int("abc") is None
+        # 非标准汉字段落（如 '第五季' 整串）解析失败
+        assert chinese_to_int("第五季") is None
+
+
+class TestBase64Encoding:
+    def test_roundtrip(self):
+        assert base64encoding("中文") == "5Lit5paH"
+        assert base64encoding("Publish Helper") == "UHVibGlzaCBIZWxwZXI="
+
+
+class TestValidateAndConvertToInt:
+    def test_valid(self):
+        assert validate_and_convert_to_int("42", "num") == 42
+
+    def test_none_raises(self):
+        with pytest.raises(ValueError):
+            validate_and_convert_to_int(None, "num")
+
+    def test_empty_raises(self):
+        with pytest.raises(ValueError):
+            validate_and_convert_to_int("", "num")
+
+    def test_non_numeric_raises(self):
+        with pytest.raises(ValueError):
+            validate_and_convert_to_int("abc", "num")
+
+
+class TestConvertChinesePunctuation:
+    def test_comma_and_period(self):
+        assert convert_chinese_punctuation_to_english("你好，世界。") == "你好, 世界. "
+
+    def test_ellipsis(self):
+        # 单个省略号 … → '...'；两个 … → 六点
+        assert convert_chinese_punctuation_to_english("…") == "..."
+        assert convert_chinese_punctuation_to_english("……") == "......"
+
+    def test_parens(self):
+        assert convert_chinese_punctuation_to_english("（注）") == " (注) "
+
+
+class TestChineseNameToPinyin:
+    def test_known_name(self):
+        # 末尾带一个空格（每个拼音后加空格再 rstrip 前）——按现状断言
+        assert chinese_name_to_pinyin("张伟") == "Zhang Wei "
