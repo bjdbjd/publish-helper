@@ -222,7 +222,7 @@ publish-helper/
 ## 📚 文档
 
 - 📖 [开发者指南](docs/DEVELOPMENT.md) - 详细的开发文档
-- 🔧 [重构说明](FORK_PROPOSAL.md) - 重构内容和改进说明
+- 🔧 [重构说明](docs/FORK_PROPOSAL.md) - 重构内容和改进说明
 - 🐳 [Docker部署](docker-compose.yml) - 容器化部署指南
 - ⚙️ [配置参考](.env.example) - 完整的配置选项
 
