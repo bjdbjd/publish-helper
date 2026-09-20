@@ -18,7 +18,7 @@ mkdir dist\\temp\\torrent
 copy media\\视频资源存放目录.txt dist\\media\\视频资源存放目录.txt
 copy temp\\pic\\默认图片目录.txt dist\\temp\\pic\\默认图片目录.txt
 copy temp\\torrent\\默认种子目录.txt dist\\temp\\torrent\\默认种子目录.txt
-copy Mandarin.dat dist\
+copy libs\pinyin\Mandarin.dat dist\
 copy LICENSE dist\
 copy README.md dist\
 copy readme.txt dist\
