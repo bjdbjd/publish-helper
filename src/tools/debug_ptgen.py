@@ -1,6 +1,6 @@
 """
 Debug tool for PT-Gen API.
-Usage: python -m src.debug_ptgen
+Usage: python -m src.tools.debug_ptgen
 
 Enter a Douban/IMDb URL and see:
   1. Raw API response JSON
