@@ -1,13 +1,16 @@
 import base64
 import hashlib
 import hmac
+import re
 import sys
 import time
+from typing import Tuple
 from urllib.parse import urlunsplit, urlsplit
 
 import requests
 
-from src.core.tool import get_settings
+from src.core.settings_tool import get_settings
+from src.core.text import int_to_chinese
 
 # Windows 控制台默认编码(GBK)无法打印 ❁/◎ 等字符，调试 print 会抛 UnicodeEncodeError
 # 并意外中断请求。将 stdout/stderr 编码错误改为 replace，仅影响打印、不影响数据。
@@ -174,3 +177,143 @@ def get_pt_gen_description(pt_gen_api_url, resource_url):
         # 处理请求过程中的其他异常
         print(f'请求发生错误：{e}')
         return False, f'PT-Gen接口请求发生错误：{e}'
+
+
+def get_playlet_description(original_title: str, year: str, area: str, category: str, language: str, season_number: str) -> str:
+    if season_number != '1':
+        original_title += ' 第' + int_to_chinese(int(season_number)) + '季'
+    return f'\n◎片　　名　{original_title}\n◎年　　代　{year}\n◎产　　地　{area}\n◎类　　别　{category}\n◎语　　言　{language}\n◎简　　介　\n'
+
+
+def get_data_from_pt_gen_description(main_title: str, description: str, media_info: str, source: str, category: str) -> Tuple[str, str, str, str, str, str, str, str]:
+    imdb_url = ''  # IMDb链接
+    douban_url = ''  # 豆瓣链接
+    description = description  # 简介
+    area = ''  # 地区
+    video_format = ''  # 分辨率
+    audio_codec = ''  # 音频编码
+    video_codec = ''  # 视频编码
+    medium = ''  # 媒介
+
+    # 获取IMDb链接
+    imdb_pattern = r'https://www\.imdb\.com/title/tt\d+/'
+    match = re.search(imdb_pattern, description)
+    # If a match is found, return it as a string, otherwise return an empty string
+    imdb_url += match.group(0) if match else ''
+    print('获取到IMDb链接' + imdb_url)
+
+    # 获取豆瓣链接
+    douban_pattern = r'https://movie\.douban\.com/subject/\d+/'
+    match = re.search(douban_pattern, description)
+    # If a match is found, return it as a string, otherwise return an empty string
+    douban_url += match.group(0) if match else ''
+    print('获取到豆瓣链接' + douban_url)
+
+    # 获取其他类型 电影/纪录/体育/剧集/动画/综艺……
+    category_pattern = r'◎类　　别　([^\n]+)'
+    match = re.search(category_pattern, description)
+    # If a match is found, return it as a string, otherwise return an empty string
+    t = match.group(0) if match else ''
+    if '纪录' in t:
+        category = '纪录'
+    if '体育' in t:
+        category = '体育'
+    if '动画' in t:
+        category = '动画'
+    if '综艺' in t or '脱口秀' in t:
+        category = '综艺'
+    if '短片' in t:
+        category = '短剧'
+    print('获取到类型' + category)
+
+    # 获取产地 欧美/大陆/港台/日本/韩国/印度
+    area_pattern = r'◎产　　地　([^\n]+)'
+    match = re.search(area_pattern, description)
+    # If a match is found, return the matched location, otherwise return an empty string
+    s = match.group(1) if match else ''
+    if '美国' in s or '英国' in s or '德国' in s or '法国' in s:
+        area = '欧美'
+    if '大陆' in s:
+        area = '大陆'
+    if '香港' in s or '台湾' in s:
+        area = '港台'
+    if '日本' in s:
+        area = '日本'
+    if '韩国' in s:
+        area = '韩国'
+    if '印度' in s:
+        area = '印度'
+    print('获取到产地' + area)
+
+    # 获取分辨率 4K/1080p/1080i/720p/SD
+    if '3840p' in main_title or '3840P' in main_title or '3840i' in main_title:
+        video_format = '8K'
+    if '2160p' in main_title or '2160P' in main_title or '2160i' in main_title:
+        video_format = '4K'
+    if '1080p' in main_title or '1080P' in main_title:
+        video_format = '1080p'
+    if '1080i' in main_title:
+        video_format = '1080i'
+    if '720p' in main_title or '720P' in main_title:
+        video_format = '720p'
+    if '720i' in main_title:
+        video_format = '720i'
+    if '480p' in main_title or '480P' in main_title:
+        video_format = '480p'
+    if '720i' in main_title:
+        video_format = '480i'
+    print('获取到分辨率' + video_format)
+
+    # 获取音频编码 AAC/AC3/DTS…………
+    if 'AAC' in main_title:
+        audio_codec = 'AAC'
+    if 'AC3' in main_title or 'DD' in main_title:
+        audio_codec = 'AC3'
+    if 'EAC3' in main_title or 'E-AC3' in main_title or 'DDP' in main_title or 'DD+' in main_title:
+        audio_codec = 'EAC3'
+    if 'DTS' in main_title:
+        if 'HD' in main_title and 'MA' in main_title:
+            audio_codec = 'DTS-HDMA'
+        else:
+            audio_codec = 'DTS'
+    if 'Atmos' in main_title or 'ATMOS' in main_title:
+        audio_codec = 'Atmos'
+    if 'TrueHD' in main_title or 'TRUEHD' in main_title:
+        audio_codec = 'TrueHD'
+    if 'Flac' in main_title or 'FLAC' in main_title:
+        audio_codec = 'Flac'
+    print('获取到音频编码' + audio_codec)
+
+    # 获取视频编码 H264/H265……
+    if 'H264' in main_title or 'H.264' in main_title or 'h264' in main_title or 'h.264' in main_title or 'AVC' in main_title or 'avc' in main_title:
+        video_codec = 'H264'
+    if 'H265' in main_title or 'H.265' in main_title or 'h265' in main_title or 'h.265' in main_title or 'HEVC' in main_title or 'hevc' in main_title:
+        video_codec = 'H265'
+    if 'H266' in main_title or 'H.266' in main_title or 'h266' in main_title or 'h.266' in main_title or 'VVC' in main_title or 'vvc' in main_title:
+        video_codec = 'H266'
+    if 'X264' in main_title or 'x264' in main_title:
+        video_codec = 'X264'
+    if 'X265' in main_title or 'x265' in main_title:
+        video_codec = 'X265'
+    if 'X266' in main_title or 'x266' in main_title:
+        video_codec = 'X266'
+    if 'AV1' in main_title or 'av1' in main_title:
+        video_codec = 'AV1'
+    print('获取到视频编码' + video_codec)
+
+    # 获取媒介 web-dl/remux/encode……
+    if source == 'WEB-DL' or 'WEB-DL' in main_title or source == 'Web-DL' or 'Web-DL' in main_title or source == 'web-dl' or 'web-dl' in main_title or source == 'WEBDL' or 'WEBDL' in main_title or source == 'WebDL' or 'WebDL' in main_title or source == 'webdl' or 'webdl' in main_title:
+        medium = 'WEB-DL'
+    if source == 'Blu-ray' or 'Blu-ray' in main_title or source == 'Blu-Ray' or 'Blu-Ray' in main_title or source == 'BluRay' or 'BluRay' in main_title or source == 'UHD Blu-ray' or source == 'UHD Blu-Ray' or source == 'UHD BluRay':
+        if 'X26' in video_codec:
+            medium = 'Encode'
+        else:
+            if 'Remux' in main_title or 'REMUX' in main_title or 'remux' in main_title or 'mkv' in media_info:
+                medium = 'Remux'
+    if source == 'HDTV' or 'HDTV' in main_title:
+        medium = 'HDTV'
+    if source == 'DVD' or 'DVD' in main_title:
+        medium = 'DVD'
+    print('获取到媒介' + medium)
+
+    return imdb_url, douban_url, category, area, video_format, audio_codec, video_codec, medium

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -16,6 +17,19 @@ except ModuleNotFoundError:
     from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def combine_directories(path: str) -> str:
+    """
+    取当前工程工作目录与传入相对路径，生成新的路径。
+
+    Args:
+        path: 相对路径
+
+    Returns:
+        拼接后的绝对路径（基于 os.getcwd()）
+    """
+    return os.path.join(os.getcwd(), path)
 
 
 def ensure_directory(path: Union[str, Path]) -> Path:
