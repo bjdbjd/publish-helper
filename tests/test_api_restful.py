@@ -57,3 +57,19 @@ def test_opt_in_auth(monkeypatch):
     assert client.get("/api/settings", headers={"Authorization": "Bearer secret"}).status_code == 200
 
     monkeypatch.setattr(s, "AUTH_TOKEN", "")
+
+
+def test_auto_handle_video_is_post():
+    """autoHandleVideo 是副作用（截图/改名）操作，应为 POST；GET 应 405。"""
+    client = api.test_client()
+    assert client.get("/api/autoHandleVideo").status_code == 405
+    resp = client.post("/api/autoHandleVideo",
+                       json={"resourceUrl": "", "path": "", "source": "", "team": "", "category": ""})
+    assert resp.status_code == 422  # 缺必填参数 => 证明 POST + JSON body 被读取
+
+
+def test_long_text_get_accepts_post_body():
+    """长文本参数端点（getPtGenInfo 的 description）允许 POST body，避免 URL 长度限制；GET 兼容保留。"""
+    client = api.test_client()
+    assert client.post("/api/getPtGenInfo", json={"description": "x"}).status_code != 405
+    assert client.get("/api/getPtGenInfo", query_string={"description": "x"}).status_code != 405

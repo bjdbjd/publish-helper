@@ -787,7 +787,7 @@ def api_get_pt_gen_description():
         }), 500
 
 
-@api.route('/api/getPlayletDescription', methods=['GET'])
+@api.route('/api/getPlayletDescription', methods=['GET', 'POST'])
 # 用于获取短剧简介
 def api_get_playlet_description():
     try:
@@ -826,7 +826,7 @@ def api_get_playlet_description():
         }), 500
 
 
-@api.route('/api/getPtGenInfo', methods=['GET'])
+@api.route('/api/getPtGenInfo', methods=['GET', 'POST'])
 # 用于获取PT-Gen简介，传入一个豆瓣链接，返回PT-Gen简介
 def api_get_pt_gen_info():
     try:
@@ -962,7 +962,7 @@ def api_make_torrent():
         }), 500
 
 
-@api.route('/api/getNameFromTemplate', methods=['GET'])
+@api.route('/api/getNameFromTemplate', methods=['GET', 'POST'])
 # 用于通过模板数据获取命名，关键参数和模板，返回获取到的命名
 def api_get_name_from_template():
     try:
@@ -1979,7 +1979,7 @@ def convert_size(size_bytes):
     return '{:.2f} {}'.format(size_bytes, size_name[i])
 
 
-@api.route('/api/autoHandleVideo', methods=['GET'])
+@api.route('/api/autoHandleVideo', methods=['POST'])
 # 用于获取MediaInfo，传入一个文件地址或者一个文件夹地址，返回视频文件路径和MediaInfo
 def api_auto_handle_movie():
     try:
