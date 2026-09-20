@@ -110,11 +110,11 @@ python src/main_cli.py
 ### Docker部署
 
 ```bash
-# 使用docker-compose
-docker-compose up -d
+# 使用docker-compose（配置在 deploy/）
+docker-compose -f deploy/docker-compose.yml up -d
 
 # 或直接构建
-docker build -t publish-helper .
+docker build -f deploy/Dockerfile -t publish-helper .
 docker run -p 15372:15372 publish-helper
 ```
 
@@ -214,16 +214,16 @@ publish-helper/
 ├── libs/                  # 跨平台二进制（deb/、macos/、pinyin/）
 ├── tests/                 # 测试代码
 ├── docs/                  # 文档
+├── deploy/                # Dockerfile + docker-compose.yml
 ├── requirements.txt       # 生产依赖
 ├── requirements-dev.txt   # 开发依赖
-└── docker-compose.yml     # Docker配置
 ```
 
 ## 📚 文档
 
 - 📖 [开发者指南](docs/DEVELOPMENT.md) - 详细的开发文档
 - 🔧 [重构说明](docs/FORK_PROPOSAL.md) - 重构内容和改进说明
-- 🐳 [Docker部署](docker-compose.yml) - 容器化部署指南
+- 🐳 [Docker部署](deploy/docker-compose.yml) - 容器化部署指南
 - ⚙️ [配置参考](.env.example) - 完整的配置选项
 
 ## 🤝 贡献

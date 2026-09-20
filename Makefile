@@ -67,13 +67,13 @@ run-cli:
 
 # Docker
 docker-build:
-	docker build -t publish-helper .
+	docker build -f deploy/Dockerfile -t publish-helper .
 
 docker-run:
-	docker-compose up -d
+	docker-compose -f deploy/docker-compose.yml up -d
 
 docker-stop:
-	docker-compose down
+	docker-compose -f deploy/docker-compose.yml down
 
 # Package building
 build:

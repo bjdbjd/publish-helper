@@ -14,7 +14,7 @@
 git clone git@github.com:bjdbjd/publish-helper.git
 PROJECT_VERSION=2.0.0
 cd publish-helper
-docker build --no-cache --progress=plain -t bdjbjd/publish-helper:${PROJECT_VERSION} -f Dockerfile .
+docker build --no-cache --progress=plain -t bdjbjd/publish-helper:${PROJECT_VERSION} -f deploy/Dockerfile .
 ```
 
 ## 2.推送镜像

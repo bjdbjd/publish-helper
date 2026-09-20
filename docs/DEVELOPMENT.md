@@ -21,7 +21,7 @@ publish-helper/
 ├── requirements.txt       # 生产依赖
 ├── requirements-dev.txt   # 开发依赖
 ├── .env.example          # 环境配置示例
-├── docker-compose.yml    # Docker编排
+├── deploy/               # Dockerfile + docker-compose.yml
 ├── Makefile              # 开发任务
 └── pyproject.toml        # 项目配置
 ```
@@ -241,7 +241,7 @@ make docker-run
 
 ```bash
 # 使用volume挂载进行开发
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+docker-compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up
 ```
 
 ## 发布流程
