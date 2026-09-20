@@ -7,7 +7,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from pymediainfo import MediaInfo
 
-from src.core.tool import get_settings, get_abbreviation, chinese_to_int, MIN_WIDTHS
+from src.core.data import get_abbreviation
+from src.core.settings_tool import get_settings
+from src.core.text import chinese_to_int
+from src.core.video import MIN_WIDTHS
 
 
 # 从PT-Gen响应中读取关键数据

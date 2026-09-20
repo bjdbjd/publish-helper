@@ -1,7 +1,9 @@
 # 感谢明日大佬、N佬做出的贡献！！！ID：tomorrow505、Exception
 from urllib.parse import quote
 
-from src.core.tool import get_settings, base64encoding, get_data_from_pt_gen_description
+from src.core.ptgen import get_data_from_pt_gen_description
+from src.core.settings_tool import get_settings
+from src.core.text import base64encoding
 
 
 def get_auto_feed_link(main_title, second_title, description, media_info, file_name, team, source, category,

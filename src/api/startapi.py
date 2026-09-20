@@ -12,10 +12,13 @@ from src.core.ptgen import get_pt_gen_description
 from src.core.rename import get_video_info, get_pt_gen_info, get_name_from_template, rename_file, rename_folder, \
     move_file_to_folder, create_hard_link
 from src.core.screenshot import get_screenshot, get_thumbnail
-from src.core.tool import check_path_and_find_video, get_settings, make_torrent, delete_season_number, \
-    get_video_files, update_combo_box_data, update_settings, \
-    get_playlet_description, get_combo_box_data, get_settings_json, update_settings_json, combine_directories, \
-    get_data_from_pt_gen_description, validate_and_convert_to_int
+from src.core.data import get_combo_box_data, update_combo_box_data
+from src.core.ptgen import get_data_from_pt_gen_description, get_playlet_description
+from src.core.settings_tool import get_settings, get_settings_json, update_settings, update_settings_json
+from src.core.text import validate_and_convert_to_int
+from src.core.torrent import make_torrent
+from src.core.video import check_path_and_find_video, delete_season_number, get_video_files
+from src.utils.file_utils import combine_directories
 
 api = Flask(__name__)
 CORS(api)

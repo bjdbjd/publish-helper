@@ -50,23 +50,28 @@ When adding code inside a module under `src/`, follow the `from src.…` convent
 
 - `src/config/settings.py` — `Config` class, instantiated once as the `config` singleton exported from `src/config/__init__.py`. Loads `.env` via `python-dotenv`, exposes constants (`API_HOST/PORT`, `PTGEN_*`, `IMAGE_HOST_*`, `LOG_LEVEL`, and path properties `BASE_DIR/SRC_DIR/STATIC_DIR/TEMP_DIR/MEDIA_DIR/LOGS_DIR`). Order of precedence: defaults → `static/settings.json` → env vars.
 - `src/utils/` — `logger.py` (`get_logger(__name__)`), `file_utils.py` (path helpers), `exceptions.py`. All exceptions subclass `PublishHelperError`; raise/handle those (`MediaInfoError`, `ScreenshotError`, `ImageUploadError`, `TorrentError`, `PTGenError`, `RenameError`, …) rather than bare `Exception`.
-- `src/core/` — the actual work, mostly pure functions:
-  - `tool.py` (largest, ~976 lines) — shared helpers: `get_settings`, `update_settings`, `combine_directories`, `check_path_and_find_video`, `make_torrent`, `get_playlet_description`, number/int helpers, `get_data_from_pt_gen_description`.
-  - `rename.py` (~490 lines) — templated naming: `get_name_from_template`, `rename_file`, `rename_folder`, `get_video_info`, `get_pt_gen_info`.
-  - `mediainfo.py`, `screenshot.py`, `picturebed.py`, `ptgen.py`, `autofeed.py`, `settings_tool.py`.
-  - `settings_tool.py` — `SettingsManager`, reads/writes `config.STATIC_DIR / "settings.json"`.
+- `src/core/` — the actual work, mostly pure functions, now organized **by domain** (one file one responsibility; the old `tool.py` dump was split in the P1 reorganization):
+  - `settings_tool.py` — `SettingsManager`, `get_settings`/`update_settings`/`get_settings_json`/`update_settings_json`, reads/writes `config.STATIC_DIR / "settings.json"`.
+  - `naming`-equivalent `rename.py` (~490 lines) — templated naming: `get_name_from_template`, `rename_file`, `rename_folder`, `get_video_info`, `get_pt_gen_info`.
+  - `data.py` — static-JSON data file access (`get_combo_box_data`/`update_combo_box_data`/`get_abbreviation`/`load_names`).
+  - `text.py` — text/number/pinyin helpers (`chinese_name_to_pinyin`, `int_to_roman`, `chinese_to_int`, `natural_keys`, `base64encoding`, `validate_and_convert_to_int`, …).
+  - `video.py` — video path/file handling (`check_path_and_find_video`, `get_video_files`, `delete_season_number`, `VIDEO_EXTENSIONS`, `MIN_WIDTHS`).
+  - `torrent.py` — `make_torrent`.
+  - `picturebed.py` — image-host upload plus host-type recognition (`get_picture_bed_type`, `find_picture_bed_type`, `generate_image_filename`).
+  - `ptgen.py` — PT-Gen API call + intro-text assembly (`get_pt_gen_description`, `get_data_from_pt_gen_description`, `get_playlet_description`).
+  - `mediainfo.py`, `screenshot.py`, `autofeed.py`, `poster.py`.
+  - `src/tools/debug_ptgen.py` — standalone debug script (`python -m src.tools.debug_ptgen`), not part of the lib.
 - `src/api/` — Flask. `startapi.py` (~2379 lines) is the endpoint/routes file; `api.py` is a thin app factory. GUI imports `start_api` for its embedded previews.
 - `src/gui/` — PyQt6. `startgui.py` (~2279 lines) is the main window; `ui_tools.py` wraps file dialogs; `ui/` holds Qt Designer-generated `mainwindow.ui`/`.py` and `settings.ui`/`.py` (edit the `.ui` in Designer, regenerate the `.py`, don't hand-edit generated code).
 
 ### Data / static files
 
-- `config.STATIC_DIR` resolves to the **repo-root `static/`** (`BASE_DIR / "static"`), which holds `settings.json`, `abbreviation.json`, `combo-box-data.json`, `picture-bed-data.json`, `ph-bjd.ico`.
-- There is also an untracked, recently-created `src/static/` holding duplicates of the JSON data files. Code reads the root `static/`; do not add new config under `src/static/` unless you update the paths.
-- Working dirs `temp/`, `media/`, `logs/` are created on startup; a large `libmediainfo.0.dylib` and `Mandarin.dat` ship at root for cross-platform MediaInfo/pinyin support.
+- `config.STATIC_DIR` resolves to the **repo-root `static/`** (`BASE_DIR / "static"`), which holds `settings.json`, `abbreviation.json`, `combo-box-data.json`, `picture-bed-data.json`, `ph-bjd.ico`. (A redundant `src/static/` copy was removed in the reorganization; root `static/` is the single source.)
+- Cross-platform support binaries live under **`libs/`**: `libs/deb/` (Docker Debian debs + entrypoint/nginx), `libs/macos/libmediainfo.0.dylib`, `libs/pinyin/Mandarin.dat`. The Dockerfile and `main_gui.py`'s PyInstaller docstring reference these paths.
+- Working dirs `temp/`, `media/`, `logs/` are created on startup.
 
 ## Gotchas
 
 - **Version is kept in two places and is currently out of sync**: `pyproject.toml` says `2.0.0`, while `src/config/__init__.py` `__version__` and the `GUI_VERSION` env default say `1.4.5`. When bumping, update both.
-- `pyproject.toml` declares `readme = "README_NEW.md"` but that file does not exist in the tree — an `flit`/`python -m build` will fail on the missing readme. The actual docs are `README.md` / `docs/DEVELOPMENT.md` (`README.md` links a `FORK_PROPOSAL.md`).
-- `docs/DEVELOPMENT.md` describes a test matrix (`test_core.py`, `test_api.py`, `test_gui.py`) that does not exist — only `tests/test_config.py` and `tests/test_utils.py` are present.
+- `docs/DEVELOPMENT.md` describes a test matrix (`test_core.py`, `test_api.py`, `test_gui.py`) that does not exist — only `tests/test_config.py`, `tests/test_utils.py`, `tests/test_settings_tool.py`, `tests/test_file_utils_json.py` and `tests/test_api_getfile.py` are present.
 - Commit messages use a Chinese `[type]:[scope][detail]` conventional style (e.g. `[feat]:[][支持了自动检测季数信息，如果不一致会自动提醒]`), not English — keep commits in this style.

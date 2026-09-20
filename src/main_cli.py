@@ -36,15 +36,11 @@ from src.core.rename import (
     rename_folder,
 )
 from src.core.screenshot import get_screenshot, get_thumbnail
-from src.core.tool import (
-    check_path_and_find_video,
-    chinese_name_to_pinyin,
-    delete_season_number,
-    get_playlet_description,
-    get_settings,
-    get_video_files,
-    make_torrent,
-)
+from src.core.ptgen import get_playlet_description
+from src.core.settings_tool import get_settings
+from src.core.text import chinese_name_to_pinyin
+from src.core.torrent import make_torrent
+from src.core.video import check_path_and_find_video, delete_season_number, get_video_files
 import os
 import shlex
 import sys
@@ -368,7 +364,7 @@ def select_from_combo_box(label, combo_data_name):
     Returns:
         Selected or custom value
     """
-    from src.core.tool import get_combo_box_data
+    from src.core.data import get_combo_box_data
 
     print(f"\n{Colors.BOLD}选择 {label}:{Colors.END}")
 

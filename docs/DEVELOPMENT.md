@@ -5,17 +5,19 @@
 ```
 publish-helper/
 ├── src/                    # 源代码
-│   ├── api/               # API模块
-│   ├── core/              # 核心功能模块
+│   ├── api/               # API模块（api.py 死代码已删）
+│   ├── core/              # 核心功能模块（按领域拆分：data/text/video/torrent/picturebed/ptgen/...）
 │   ├── gui/               # GUI模块
 │   ├── config/            # 配置模块
 │   ├── utils/             # 工具模块
-│   ├── main_gui.py        # GUI入口点
+│   ├── tools/             # 独立调试脚本（debug_ptgen.py）
+│   ├── main_gui.py        # GUI入口点（含 PyInstaller 打包说明）
 │   ├── main_api.py        # API入口点
 │   └── main_cli.py        # CLI入口点（交互式命令行）
+├── libs/                  # 跨平台二进制（deb/、macos/、pinyin/）
 ├── tests/                 # 测试代码
 ├── docs/                  # 文档
-├── static/                # 静态资源
+├── static/                # 静态资源（settings.json 等，唯一来源）
 ├── requirements.txt       # 生产依赖
 ├── requirements-dev.txt   # 开发依赖
 ├── .env.example          # 环境配置示例

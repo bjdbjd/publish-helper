@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from src.core.tool import generate_image_filename
+from src.core.picturebed import generate_image_filename
 
 
 # 参数：video_path：源视频路径；screenshot_path：输出图片路径；screenshot_number：截图的总数量；screenshot_start：截图的起始帧占比，避免截取黑帧；

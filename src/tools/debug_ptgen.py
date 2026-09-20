@@ -14,7 +14,8 @@ import sys
 import pyperclip
 
 from src.core.ptgen import get_pt_gen_description
-from src.core.tool import get_settings, get_data_from_pt_gen_description
+from src.core.ptgen import get_data_from_pt_gen_description
+from src.core.settings_tool import get_settings
 
 
 def separator(title: str = "") -> None:

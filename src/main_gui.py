@@ -21,7 +21,7 @@ copy temp\\torrent\\默认种子目录.txt dist\\temp\\torrent\\默认种子目�
 copy libs\pinyin\Mandarin.dat dist\
 copy LICENSE dist\
 copy README.md dist\
-copy readme.txt dist\
+copy docs\readme-usage.txt dist\readme.txt
 
 项目根目录下生成的dist文件夹就是打包好的软件。
 项目仓库地址：https://github.com/bjdbjd/publish-helper

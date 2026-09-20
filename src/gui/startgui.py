@@ -18,10 +18,12 @@ from src.core.ptgen import get_pt_gen_description
 from src.core.rename import get_pt_gen_info, get_video_info, get_name_from_template, rename_file, rename_folder, \
     move_file_to_folder, create_hard_link
 from src.core.screenshot import get_screenshot, get_thumbnail
-from src.core.tool import update_settings, get_settings, check_path_and_find_video, make_torrent, \
-    chinese_name_to_pinyin, \
-    get_video_files, is_filename_too_long, get_playlet_description, delete_season_number, \
-    get_combo_box_data, validate_and_convert_to_int
+from src.core.data import get_combo_box_data
+from src.core.ptgen import get_playlet_description
+from src.core.settings_tool import get_settings, update_settings
+from src.core.text import chinese_name_to_pinyin, validate_and_convert_to_int
+from src.core.torrent import make_torrent
+from src.core.video import check_path_and_find_video, delete_season_number, get_video_files, is_filename_too_long
 from src.gui.ui.mainwindow import Ui_Mainwindow
 from src.gui.ui.settings import Ui_Settings
 from src.gui.ui.toast import show_toast

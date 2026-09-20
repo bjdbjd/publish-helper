@@ -204,12 +204,14 @@ publish-helper/
 │   │   ├── logger.py      # 日志系统
 │   │   ├── exceptions.py  # 异常定义
 │   │   └── file_utils.py  # 文件工具
-│   ├── core/              # 核心功能
+│   ├── core/              # 核心功能（按领域拆分：data/text/video/torrent/picturebed/ptgen/...）
 │   ├── gui/               # GUI界面
 │   ├── api/               # API接口
+│   ├── tools/             # 独立调试脚本（debug_ptgen.py）
 │   ├── main_gui.py        # GUI入口
 │   ├── main_api.py        # API入口
 │   └── main_cli.py        # CLI入口（交互式命令行）
+├── libs/                  # 跨平台二进制（deb/、macos/、pinyin/）
 ├── tests/                 # 测试代码
 ├── docs/                  # 文档
 ├── requirements.txt       # 生产依赖
