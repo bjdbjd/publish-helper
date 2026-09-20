@@ -34,6 +34,19 @@ def _log(*args):
     logger.debug(' '.join(str(a) for a in args))
 
 
+def _ok(data=None, message='成功', status_code='OK', http_status=200):
+    """统一成功 JSON 响应（RESTful）：data 默认空 dict。"""
+    return jsonify({'data': data or {}, 'message': message, 'statusCode': status_code}), http_status
+
+
+def _error(status_code, message, http_status=400, data=None, exc=None):
+    """统一错误 JSON 响应：真实异常写入服务端日志（exc），客户端仅收到通用 message，不泄露内部细节。
+    http_status 遵循 REST 语义（401 未授权 / 404 不存在 / 422 校验失败 / 500 服务器错误）。"""
+    if exc is not None:
+        logger.error('%s [%s]', message, status_code, exc_info=exc)
+    return jsonify({'data': data or {}, 'message': message, 'statusCode': status_code}), http_status
+
+
 def start_api():
     api.run(host=config.API_HOST, port=int(get_settings('api_port')), debug=config.API_DEBUG, use_reloader=False,
             threaded=True)
@@ -241,13 +254,14 @@ def api_get_screenshot():
                 'statusCode': 'VALUE_RANGE_ERROR'
             }), 422
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'screenshotNumber': '0',
                 'screenshotPath': '',
                 'videoPath': ''
             },
-            'message': f'获取截图失败：{e}',
+            'message': f'获取截图失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -388,12 +402,13 @@ def api_get_thumbnail():
                 'statusCode': 'VALUE_RANGE_ERROR'
             }), 422
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'thumbnailPath': '',
                 'videoPath': ''
             },
-            'message': f'获取截图失败：{e}',
+            'message': f'获取截图失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -454,12 +469,13 @@ def api_upload_picture():
                 'statusCode': 'BACKEND_PROCESSING_ERROR'
             }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'pictureBbCode': '',
                 'pictureUrl': ''
             },
-            'message': f'上传图片失败：{e}。',
+            'message': f'上传图片失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -532,12 +548,13 @@ def api_get_media_info():
                 'statusCode': 'BACKEND_PROCESSING_ERROR'
             }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'mediaInfo': '',
                 'videoPath': ''
             },
-            'message': f'获取MediaInfo失败，错误：{e}。',
+            'message': f'获取MediaInfo失败，错误，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -653,6 +670,7 @@ def api_get_video_info():
                 'statusCode': 'BACKEND_PROCESSING_ERROR'
             }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'videoPath': '',
@@ -665,7 +683,7 @@ def api_get_video_info():
                 'channels': '',
                 'audioNum': ''
             },
-            'message': f'获取视频关键参数失败：{e}。',
+            'message': f'获取视频关键参数失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -720,6 +738,7 @@ def api_get_pt_gen_description():
                     else:
                         _log(f'Poster processing failed: {process_result}')
                 except Exception as e:
+                    logger.error('接口异常：%s', e, exc_info=True)
                     _log(f'Error processing poster: {e}')
             
             return jsonify({
@@ -739,11 +758,12 @@ def api_get_pt_gen_description():
                 'statusCode': 'BACKEND_PROCESSING_ERROR'
             }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'description': ''
             },
-            'message': f'获取PT-Gen简介失败：{e}。',
+            'message': f'获取PT-Gen简介失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -777,11 +797,12 @@ def api_get_playlet_description():
             'statusCode': 'OK'
         })
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'playletDescription': ''
             },
-            'message': f'获取短剧简介失败：{e}。',
+            'message': f'获取短剧简介失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -839,6 +860,7 @@ def api_get_pt_gen_info():
             'statusCode': 'OK'
         })
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'originalTitle': '',
@@ -848,7 +870,7 @@ def api_get_pt_gen_info():
                 'category': '',
                 'actors': ''
             },
-            'message': f'对于简介的分析有错误：{e}。',
+            'message': f'对于简介的分析有错误，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -911,11 +933,12 @@ def api_make_torrent():
                 'statusCode': 'BACKEND_PROCESSING_ERROR'
             }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'torrentPath': ''
             },
-            'message': f'制作种子失败：{e}。',
+            'message': f'制作种子失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -981,11 +1004,12 @@ def api_get_name_from_template():
             'statusCode': 'OK'
         })
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'name': ''
             },
-            'message': f'获取名称失败：{e}',
+            'message': f'获取名称失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1045,9 +1069,10 @@ def api_rename_folder():
                 'statusCode': 'BACKEND_PROCESSING_ERROR'
             }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'重命名文件失败：{e}。',
+            'message': f'重命名文件失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1117,11 +1142,12 @@ def api_rename_file():
                 'statusCode': 'BACKEND_PROCESSING_ERROR'
             }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'newFilePath': ''
             },
-            'message': f'重命名文件失败：{e}。',
+            'message': f'重命名文件失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1180,11 +1206,12 @@ def api_create_hard_link():
                 'statusCode': 'BACKEND_PROCESSING_ERROR'
             }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'hardLinkPath': ''
             },
-            'message': f'创建硬链接失败：{e}。',
+            'message': f'创建硬链接失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1254,11 +1281,12 @@ def api_move_file_to_folder():
                 'statusCode': 'BACKEND_PROCESSING_ERROR'
             }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'newFilePath': ''
             },
-            'message': f'移动文件失败：{e}。',
+            'message': f'移动文件失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1387,11 +1415,12 @@ def api_rename_episode():
                     'statusCode': 'BACKEND_PROCESSING_ERROR'
                 }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'newFolderPath': ''
             },
-            'message': f'批量重命名失败：{e}。',
+            'message': f'批量重命名失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1487,11 +1516,12 @@ def api_get_total_episode():
                     'statusCode': 'BACKEND_PROCESSING_ERROR'
                 }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'totalEpisode': ''
             },
-            'message': f'批量重命名失败：{e}。',
+            'message': f'批量重命名失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1539,11 +1569,12 @@ def api_get_combo_box_data():
                     'statusCode': 'BACKEND_PROCESSING_ERROR'
                 }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'configurationData': ''
             },
-            'message': f'获取数据失败：{e}。',
+            'message': f'获取数据失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1592,9 +1623,10 @@ def api_update_combo_box_data():
                     'statusCode': 'BACKEND_PROCESSING_ERROR'
                 }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'更新数据失败：{e}。',
+            'message': f'更新数据失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1624,11 +1656,12 @@ def api_get_settings():
             'statusCode': 'OK'
         })
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'settingsData': ''
             },
-            'message': f'获取设置信息失败：{e}。',
+            'message': f'获取设置信息失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1663,9 +1696,10 @@ def api_update_settings():
             'statusCode': 'OK'
         })
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'更新设置信息失败：{e}。',
+            'message': f'更新设置信息失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1712,9 +1746,10 @@ def api_get_file():
         # 返回文件
         return send_file(str(target_path), as_attachment=True)
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'获取文件失败：{e}。',
+            'message': f'获取文件失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1733,11 +1768,12 @@ def api_settings():
             'statusCode': 'OK'
         })
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'settings': ''
             },
-            'message': f'获取设置信息失败：{e}。',
+            'message': f'获取设置信息失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1755,9 +1791,10 @@ def api_settings_update():
             'statusCode': 'OK'
         })
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'更新设置信息失败：{e}。',
+            'message': f'更新设置信息失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1826,11 +1863,12 @@ def api_get_pt_gen_info_by_url():
                 'statusCode': 'BACKEND_PROCESSING_ERROR'
             }), 400
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'description': ''
             },
-            'message': f'获取PT-Gen简介失败：{e}。',
+            'message': f'获取PT-Gen简介失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1861,11 +1899,13 @@ def api_medis_path():
         }), 200
 
     except Exception as e:
+
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
                 'description': ''
             },
-            'message': f'获取路径失败：{e}。',
+            'message': f'获取路径失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -1893,6 +1933,7 @@ def list_files_and_dirs(target_path):
                 # It's a directory, size is not applicable
                 file_list.append({'name': entry, 'size': 'N/A', 'type': '文件夹'})
     except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
         raise RuntimeError(f'Error accessing {target_path}: {e}', e)
     return file_list
 
@@ -2429,22 +2470,28 @@ def api_auto_handle_movie():
         }), 200
 
     except ValueError as e:
+
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'您提供的参数有误：{str(e)}。',
+            'message': f'您提供的参数有误，详情请查看服务端日志。',
             'statusCode': 'RUNTIME_ERROR'
         }), 422
 
     except RuntimeError as e:
+
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'自动处理视频资源失败：{str(e)}。',
+            'message': f'自动处理视频资源失败，详情请查看服务端日志。',
             'statusCode': 'RUNTIME_ERROR'
         }), 500
 
     except Exception as e:
+
+        logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'自动处理视频文件时发生了意外错误：{str(e)}。',
+            'message': f'自动处理视频文件时发生了意外错误，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
