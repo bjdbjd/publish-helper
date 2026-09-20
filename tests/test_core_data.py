@@ -55,10 +55,11 @@ class TestUpdateComboBoxData:
         assert data["team"] == ["A", "B", "C"]
 
     def test_file_missing_creates(self, tmp_path, chdir_to_tmp):
-        (tmp_path / "static").mkdir(parents=True, exist_ok=True)
+        # 修复后无需预建 static/ 目录——update_combo_box_data 会自动创建
         ok, msg = update_combo_box_data("X", "team")
         assert ok is True
         assert "文件不存在，已创建新文件并更新" in msg
+        assert (tmp_path / "static" / "combo-box-data.json").exists()
 
 
 class TestGetAbbreviation:

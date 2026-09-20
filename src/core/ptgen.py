@@ -75,8 +75,8 @@ def _get_auth_secret():
 def get_pt_gen_description(pt_gen_api_url, resource_url):
     try:
         # 清除多余的空格
-        resource_url.replace(' ', '')
-        resource_url.replace('　', '')
+        resource_url = resource_url.replace(' ', '')
+        resource_url = resource_url.replace('　', '')
 
         # 检查是否是tt开头后面跟数字的字符串
         if resource_url.startswith('tt') and resource_url[2:].isdigit():
@@ -260,7 +260,7 @@ def get_data_from_pt_gen_description(main_title: str, description: str, media_in
         video_format = '720i'
     if '480p' in main_title or '480P' in main_title:
         video_format = '480p'
-    if '720i' in main_title:
+    if '480i' in main_title or '480P' in main_title:
         video_format = '480i'
     print('获取到分辨率' + video_format)
 

@@ -290,7 +290,7 @@ def get_video_info(file_path: str) -> Tuple[bool, list]:
             elif track.track_type == 'Video':
                 if track.other_width:
                     width += track.other_width[0]
-                if track.other_width:
+                if track.other_height:
                     height += track.other_height[0]
                 if track.other_format:
                     video_codec += track.other_format[0]

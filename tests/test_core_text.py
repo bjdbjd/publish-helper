@@ -59,12 +59,23 @@ class TestIntToChinese:
         assert int_to_chinese(0) == "零"
 
     def test_under_20(self):
-        # 注意：当前算法会在十位前补一个'一'（'一十一'），按现状断言
-        assert int_to_chinese(11) == "一十一"
+        # 标准写法：11→十一、15→十五（省略十位前导一）
+        assert int_to_chinese(11) == "十一"
+        assert int_to_chinese(15) == "十五"
 
     def test_multiple_of_ten(self):
-        # 算法对 10 也会补前导一 → '一十'，按现状断言
-        assert int_to_chinese(10) == "一十"
+        # 10→十、20→二十（无前导一）
+        assert int_to_chinese(10) == "十"
+        assert int_to_chinese(20) == "二十"
+
+    def test_hundreds_with_zero(self):
+        assert int_to_chinese(100) == "一百"
+        assert int_to_chinese(101) == "一百零一"
+        assert int_to_chinese(110) == "一百一十"
+
+    def test_thousands(self):
+        assert int_to_chinese(1000) == "一千"
+        assert int_to_chinese(1001) == "一千零一"
 
     def test_out_of_range(self):
         assert int_to_chinese(-1) == "数字超出范围"
@@ -75,12 +86,23 @@ class TestChineseToInt:
     def test_single_digit(self):
         assert chinese_to_int("五") == 5
         assert chinese_to_int("二") == 2
+        assert chinese_to_int("零") == 0
+
+    def test_tens(self):
         assert chinese_to_int("十") == 10
+        assert chinese_to_int("十一") == 11
+        assert chinese_to_int("十五") == 15
+        assert chinese_to_int("二十") == 20
+        assert chinese_to_int("二十一") == 21
+
+    def test_hundreds_thousands(self):
+        assert chinese_to_int("三百") == 300
+        assert chinese_to_int("一千零一") == 1001
+        assert chinese_to_int("一千一百") == 1100
 
     def test_invalid_returns_none(self):
         assert chinese_to_int("abc") is None
-        # 非标准汉字段落（如 '第五季' 整串）解析失败
-        assert chinese_to_int("第五季") is None
+        assert chinese_to_int("") is None
 
 
 class TestBase64Encoding:

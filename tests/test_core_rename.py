@@ -111,6 +111,35 @@ class TestGetVideoInfo:
         assert "国语" in info[8]
         assert "英语" in info[8]
 
+    def test_portrait_height_gt_width_uses_height(self, fake_mediainfo, monkeypatch):
+        # 修复：height 检查错写（other_width→other_height）导致竖屏资源误标分辨率
+        import src.core.rename as rename_mod
+        import tempfile
+        holder = {}
+        holder["tracks"] = [
+            make_track("Video", other_width=["1 080 pixels"], other_height=["1 920 pixels"],
+                       other_format=["AVC"],
+                       other_hdr_format=[""], other_bit_depth=[""], writing_library=""),
+        ]
+
+        class _Fake:
+            @property
+            def tracks(self):
+                return holder["tracks"]
+            def to_json(self):
+                import json
+                return json.dumps({"tracks": [t.__dict__ for t in holder["tracks"]]})
+
+        monkeypatch.setattr(rename_mod.MediaInfo, "parse", staticmethod(lambda path: _Fake()))
+        p = tempfile.mktemp(suffix=".mkv"); open(p, "w").close()
+        try:
+            ok, info = get_video_info(p)
+        finally:
+            os.remove(p)
+        assert ok is True
+        # height 1920 > width 1080 → 选较长边 height → '1080p'
+        assert info[0] == "1080p"
+
 
 # ----------------------------------------------------------- get_name_from_template
 

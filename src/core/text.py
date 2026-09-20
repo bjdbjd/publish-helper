@@ -114,32 +114,35 @@ def int_to_special_roman(num: int) -> str:
 def int_to_chinese(num: int) -> str:
     if num < 0 or num > 9999:
         return '数字超出范围'
+    if num == 0:
+        return '零'
 
     digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
     units = ['', '十', '百', '千']
-    parts = []
 
-    if num == 0:
-        return digits[0]
+    s = str(num)
+    chars = []
+    for i, ch in enumerate(s):
+        d = int(ch)
+        unit = units[len(s) - 1 - i]
+        if d == 0:
+            # 只有中间（后面还有非零位）才补 '零'；尾部/连续零不补
+            if chars and chars[-1] != '零' and any(x != '0' for x in s[i + 1:]):
+                chars.append('零')
+        else:
+            chars.append(digits[d] + unit)
 
-    # 处理千位到个位
-    unit_index = 0
-    while num > 0:
-        digit = num % 10
-        if digit > 0:
-            parts.append(digits[digit] + units[unit_index])
-        elif len(parts) > 0 and parts[-1] != digits[0]:
-            parts.append(digits[0])
-        num //= 10
-        unit_index += 1
-
-    # 处理完毕后，parts 数组是倒序的，需要反转回来
-    return ''.join(parts[::-1])
+    result = ''.join(chars)
+    # 10-19 省略十位前导一：'一十'→'十'、'一十五'→'十五'
+    if 10 <= num < 20:
+        result = result[1:]
+    return result
 
 
 def chinese_to_int(chinese_num: str) -> Union[int, None]:
     try:
-        # 定义中文数字到阿拉伯数字的映射
+        if not chinese_num:
+            return None
         num_map = {
             '零': 0,
             '一': 1,
@@ -152,31 +155,28 @@ def chinese_to_int(chinese_num: str) -> Union[int, None]:
             '八': 8,
             '九': 9,
         }
+        unit_map = {
+            '十': 10,
+            '百': 100,
+            '千': 1000,
+            '万': 10000,
+        }
 
-        unit = 1
+        # 逐字符解析：数字字符累加到 current，遇到单位则按单位进档
         total = 0
-
-        for char in reversed(chinese_num):
+        current = 0
+        for char in chinese_num:
             if char in num_map:
-                value = num_map[char]
-                if value >= unit:
-                    unit = value
-                else:
-                    total += unit * value
-            elif char == '十':
-                unit *= 10
-            elif char == '百':
-                unit *= 100
-            elif char == '千':
-                unit *= 1000
-            elif char == '万':
-                unit *= 10000
+                current = num_map[char]
+            elif char in unit_map:
+                unit = unit_map[char]
+                # '十' 前无数字时视为 1 个十（'十' → 10）
+                current = current if current != 0 else 1
+                total += current * unit
+                current = 0
             else:
                 raise ValueError(f"无法识别的字符: {char}")
-
-        if unit >= 1:
-            total += unit
-
+        total += current
         return total
     except ValueError:
         return None

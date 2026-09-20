@@ -90,6 +90,7 @@ def update_combo_box_data(configuration_data: str, configuration_name: str) -> T
 
     except FileNotFoundError:
         # 文件不存在时，创建新文件并写入数据
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, 'w', encoding='utf-8') as file:
             json.dump({configuration_name: sources_list}, file, ensure_ascii=False, indent=4)
         return True, '文件不存在，已创建新文件并更新'

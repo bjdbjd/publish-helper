@@ -199,6 +199,15 @@ class TestGetDataFromPtGenDescription:
         _, _, _, _, video_format, *_ = get_data_from_pt_gen_description("Title 2160p", "", "", "WEB-DL", "电影")
         assert video_format == "4K"
 
+    def test_resolution_720i_not_480i(self):
+        # 修复：'720i' 不应被误标为 '480i'
+        _, _, _, _, video_format, *_ = get_data_from_pt_gen_description("Title 720i", "", "", "WEB-DL", "电影")
+        assert video_format == "720i"
+
+    def test_resolution_480i(self):
+        _, _, _, _, video_format, *_ = get_data_from_pt_gen_description("Title 480i", "", "", "WEB-DL", "电影")
+        assert video_format == "480i"
+
     def test_medium_webdl(self):
         *_, medium = get_data_from_pt_gen_description("", "", "", "WEB-DL", "电影")
         assert medium == "WEB-DL"
