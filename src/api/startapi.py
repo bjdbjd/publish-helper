@@ -25,7 +25,26 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 api = Flask(__name__)
-CORS(api)
+
+# ---- 可选鉴权 / CORS 收窄（默认全兼容，配置后启用）----
+# 设置环境变量 API_AUTH_TOKEN 后，全端点要求 `Authorization: Bearer <token>`；未设置则如常开放。
+AUTH_TOKEN = os.getenv('API_AUTH_TOKEN', '').strip()
+# 逗号分隔的允许来源白名单；默认 '*'（同旧行为）。设非 '*' 时 CORS 收窄到指定 origin。
+_CORS_ORIGINS = os.getenv('API_CORS_ORIGINS', '*').strip() or '*'
+CORS(api, origins=_CORS_ORIGINS.split(',') if _CORS_ORIGINS != '*' else '*')
+
+
+@api.before_request
+def _require_auth():
+    """配置了 API_AUTH_TOKEN 时对全端点校验 Bearer Token；未配置则放行（向后兼容）。"""
+    if not AUTH_TOKEN:
+        return None
+    auth = request.headers.get('Authorization', '')
+    token = auth[7:] if auth.startswith('Bearer ') else ''
+    if token != AUTH_TOKEN:
+        logger.warning('未授权请求被拒绝：%s %s', request.method, request.path)
+        return _error('UNAUTHORIZED', '未授权或凭据无效。', 401)
+    return None
 
 
 def _log(*args):

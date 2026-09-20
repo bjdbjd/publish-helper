@@ -40,3 +40,20 @@ def test_payload_returns_werkzeug_multidict(client):
     resp = client.post("/api/makeTorrent", data='{"path": "%s"}' % UNUSED,
                        content_type="application/json")
     assert resp.status_code == 422
+
+
+def test_opt_in_auth(monkeypatch):
+    """配置 API_AUTH_TOKEN 后全端点鉴权；未配置则开放（向后兼容）。"""
+    import src.api.startapi as s
+    client = s.api.test_client()
+
+    # 默认不鉴权
+    assert client.get("/api/settings").status_code == 200
+
+    # 模拟启用
+    monkeypatch.setattr(s, "AUTH_TOKEN", "secret")
+    assert client.get("/api/settings").status_code == 401
+    assert client.get("/api/settings", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert client.get("/api/settings", headers={"Authorization": "Bearer secret"}).status_code == 200
+
+    monkeypatch.setattr(s, "AUTH_TOKEN", "")
