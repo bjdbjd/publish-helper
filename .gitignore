@@ -50,6 +50,10 @@ temp/
 *.log
 *.tmp
 
+# CWD 运行产生的冗余拷贝（combine_directories 基于 os.getcwd()）
+src/static/
+src/temp/
+
 # Configuration (but keep examples)
 .env
 static/settings.json
