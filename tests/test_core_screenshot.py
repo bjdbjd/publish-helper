@@ -117,6 +117,22 @@ class TestGetScreenshot:
         assert ok is False
         assert msg == ["无法加载视频"]
 
+    def test_keyframe_acceptance(self, cap, fixed_random, fixed_filename, tmp_path, monkeypatch):
+        # std 高且时间间隔满足 → 关键帧接受分支（L71-75），全部收集
+        monkeypatch.setattr(np, "std", lambda frame: 100.0)  # > threshold 30
+        fixed_random([100, 200, 300])  # times 4/8/12s, 间隔 4s > min_interval
+        ok, paths = get_screenshot("/v.mp4", str(tmp_path), 3, 30.0, 0.1, 0.9)
+        assert ok is True
+        assert len(paths) == 3
+
+    def test_interval_not_satisfied_fallback(self, cap, fixed_random, fixed_filename, tmp_path, monkeypatch):
+        # 相邻 timestamps 间隔 < min_interval → 间隔不满足兜底（L86-93）
+        monkeypatch.setattr(np, "std", lambda frame: 100.0)  # 高 std，但间隔不满足
+        fixed_random([100, 101, 102])  # times 4.0/4.04/4.08s, 间隔 0.04s < 0.4s
+        ok, paths = get_screenshot("/v.mp4", str(tmp_path), 3, 30.0, 0.1, 0.9)
+        assert ok is True
+        assert len(paths) == 3
+
     def test_mkdir_permission_error(self, tmp_path, monkeypatch):
         import os
         # 传入不存在的路径，触发 os.makedirs 分支

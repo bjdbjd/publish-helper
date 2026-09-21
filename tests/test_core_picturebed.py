@@ -194,6 +194,100 @@ class TestPixhost:
         assert url == "[img]https://img.imgix.net/images/x.jpg[/img]"
 
 
+class TestProviderErrorBranches:
+    """各 provider 的异常分支（网络/解析失败需逐家 mock requests.post 抛异常）。
+
+    用 monkeypatch 让 requests.post 抛 requests.RequestException，验证返回
+    (False, 中文错误)。另测 JSON 解析失败（KeyError/JSONDecodeError）。
+    """
+
+    @pytest.fixture
+    def raise_post(self, monkeypatch):
+        import requests
+
+        def _make(exc):
+            def _raise(*a, **k):
+                raise exc
+            monkeypatch.setattr("requests.post", _raise)
+        return _make
+
+    def test_lsky_request_exception(self, img_file, raise_post):
+        import requests
+        raise_post(requests.RequestException("net down"))
+        ok, msg = lsky_pro_picture_bed("https://lsky/api", "tok", img_file)
+        assert ok is False
+        assert "请求过程中出现错误" in msg
+
+    def test_lsky_key_error(self, post_fake, img_file):
+        # 缺 links.bbcode → KeyError 分支
+        post_fake["resp"] = FakeResponse(200, text=json.dumps({"data": {}}))
+        ok, msg = lsky_pro_picture_bed("https://lsky/api", "tok", img_file)
+        assert ok is False
+        assert "缺少所需的值" in msg or "缺少data" in msg or "缺少links" in msg
+
+    def test_bohe_request_exception(self, img_file, raise_post):
+        import requests
+        raise_post(requests.RequestException("down"))
+        ok, msg = bohe_picture_bed("https://bohe/api", "tok", img_file)
+        assert ok is False
+        assert "请求过程中出现错误" in msg
+
+    def test_bohe_invalid_json(self, post_fake, img_file):
+        post_fake["resp"] = FakeResponse(200, text="not json at all")
+        ok, msg = bohe_picture_bed("https://bohe/api", "tok", img_file)
+        assert ok is False
+        assert msg == "响应不是有效的JSON格式"
+
+    def test_chevereto_request_exception(self, img_file, raise_post):
+        import requests
+        raise_post(requests.RequestException("down"))
+        ok, msg = chevereto_picture_bed("https://ch/api", "tok", img_file)
+        assert ok is False
+        assert "请求过程中出现错误" in msg
+
+    def test_chevereto_key_error(self, post_fake, img_file):
+        post_fake["resp"] = FakeResponse(200, text=json.dumps({"other": "x"}))
+        ok, msg = chevereto_picture_bed("https://ch/api", "tok", img_file)
+        assert ok is False
+        assert "缺少所需的值" in msg
+
+    def test_freeimage_request_exception(self, img_file, raise_post):
+        import requests
+        raise_post(requests.RequestException("down"))
+        ok, msg = freeimage_picture_bed("https://free/api", "tok", img_file)
+        assert ok is False
+        assert "请求过程中出现错误" in msg
+
+    def test_imgbb_request_exception(self, img_file, raise_post):
+        import requests
+        raise_post(requests.RequestException("down"))
+        ok, msg = imgbb_picture_bed("https://imgbb/api", "tok", img_file)
+        assert ok is False
+        assert "请求过程中出现错误" in msg
+
+    def test_pixhost_request_exception(self, img_file, raise_post):
+        import requests
+        raise_post(requests.RequestException("down"))
+        ok, msg = pixhost_picture_bed("https://api.pixhost.to/images", img_file)
+        assert ok is False
+        assert "请求过程中出现错误" in msg
+
+    def test_pixhost_key_error(self, post_fake, img_file):
+        post_fake["resp"] = FakeResponse(200, text=json.dumps({"foo": "x"}))
+        ok, msg = pixhost_picture_bed("https://api.pixhost.to/images", img_file)
+        assert ok is False
+        assert "缺少所需的值" in msg
+
+    def test_upload_unknown_type(self, tmp_path, chdir_to_tmp, img_file):
+        # 类型未识别（图床 JSON 全空）→ 防御消息
+        static_dir = tmp_path / "static"
+        static_dir.mkdir()
+        (static_dir / "picture-bed-data.json").write_text("{}", encoding="utf-8")
+        ok, msg = upload_picture("https://unknown.example/api", "tok", img_file)
+        assert ok is False
+        assert "暂未配置" in msg
+
+
 class TestUploadPicture:
     def test_missing_file(self, chdir_to_tmp):
         ok, msg = upload_picture("https://freeimage.host/api/1/upload", "tok", "/ghost.png")
