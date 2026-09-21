@@ -108,7 +108,6 @@ class mainwindow(QMainWindow, Ui_Mainwindow):
         self.autoFeedButtonMovie.clicked.connect(self.auto_feed_button_movie_clicked)
 
         # TV
-        self.actionsettings.triggered.connect(self.settings_clicked)
         self.getPtGenButtonTV.clicked.connect(self.get_pt_gen_button_tv_clicked)
         self.getPictureButtonTV.clicked.connect(self.get_picture_button_tv_clicked)
         self.selectVideoFolderButtonTV.clicked.connect(self.select_video_folder_button_tv_clicked)
@@ -1193,7 +1192,7 @@ class mainwindow(QMainWindow, Ui_Mainwindow):
                         return
                     
                     # Process poster if auto download and upload is enabled
-                    description = self._process_poster_in_description(description)
+                    description = self._process_poster_in_description_tv(description)
                     
                     self.descriptionBrowserTV.setText(description)
                 else:
@@ -1662,7 +1661,7 @@ class mainwindow(QMainWindow, Ui_Mainwindow):
                     for r in pictures:
                         screenshot_path += r
                         screenshot_path += '\n'
-                    self.pictureUrlBrowserMovie.setText(screenshot_path)
+                    self.pictureUrlBrowserPlaylet.setText(screenshot_path)
             else:
                 self.debugBrowserPlaylet.append(f'截图失败{response[0]}')
         else:
@@ -1791,7 +1790,7 @@ class mainwindow(QMainWindow, Ui_Mainwindow):
                             return
                 year = self.yearEditPlaylet.text()
                 season = self.seasonBoxPlaylet.text()
-                episodes_start_number = validate_and_convert_to_int(self.episodesStartBoxTV.text(),
+                episodes_start_number = validate_and_convert_to_int(self.episodesStartBoxPlaylet.text(),
                                                                     'episodes_start_number')
                 season_number = season
                 if len(season) < 2:
