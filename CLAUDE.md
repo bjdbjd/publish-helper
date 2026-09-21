@@ -72,6 +72,7 @@ When adding code inside a module under `src/`, follow the `from src.…` convent
 
 ## Gotchas
 
-- **Version is kept in two places and is currently out of sync**: `pyproject.toml` says `2.0.0`, while `src/config/__init__.py` `__version__` and the `GUI_VERSION` env default say `1.4.5`. When bumping, update both.
+- **Version is kept in three places and they are now kept in sync**: `pyproject.toml` `version`, `src/config/__init__.py` `__version__`, and the `GUI_VERSION` env default in `src/config/settings.py` — all three are `2.0.0` as of the v2.0.0 release (they were previously out of sync at `2.0.0` / `1.4.5` / `1.4.5`). When bumping, update all three.
+- **Packaging uses a writable-vs-bundle split** (`src/config/settings.py`): `BASE_DIR` is the writable data root — `Path(sys.executable).parent` when frozen, project root otherwise — while `BUNDLE_DIR` is the read-only `sys._MEIPASS` holding the bundled `static/`. Do NOT reintroduce `Path(__file__).parent.parent.parent` as `BASE_DIR`: under PyInstaller onefile that points into the per-run temp extraction dir, so user settings, `media/` and `logs/` would silently reset on every launch. Seeded bundled files are copy-if-absent, so upgrades never clobber an existing `static/settings.json`.
 - `docs/DEVELOPMENT.md` describes a test matrix (`test_core.py`, `test_api.py`, `test_gui.py`) that does not exist — only `tests/test_config.py`, `tests/test_utils.py`, `tests/test_settings_tool.py`, `tests/test_file_utils_json.py` and `tests/test_api_getfile.py` are present.
 - Commit messages use a Chinese `[type]:[scope][detail]` conventional style (e.g. `[feat]:[][支持了自动检测季数信息，如果不一致会自动提醒]`), not English — keep commits in this style.

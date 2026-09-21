@@ -1448,7 +1448,7 @@ def get_abbreviation(original_name: str, json_file_path: str = 'static/abbreviat
 | `API_PORT` | `API_PORT` | `15372`（`int()`） | `main_api:37` 仅日志；**实际监听端口走 `get_settings('api_port')`** |
 | `API_DEBUG` | `API_DEBUG` | `"false"`（`.lower()=="true"`） | `startapi:71`、`main_api:38` |
 | `GUI_TITLE` | `GUI_TITLE` | `"Publish Helper"` | **代码零引用**（仅 `.env.example` 声明） |
-| `GUI_VERSION` | `GUI_VERSION` | `"1.4.5"` | `main_gui:53` 仅日志 |
+| `GUI_VERSION` | `GUI_VERSION` | `"2.0.0"` | `main_gui:53` 仅日志 |
 | `PTGEN_API_URL` | `PTGEN_API_URL` | `""` | **代码零引用**（PT-Gen 实际走 settings 的 `pt_gen_api_url`） |
 | `PTGEN_API_KEY` | `PTGEN_API_KEY` | `""` | **代码零引用** |
 | `IMAGE_HOST_TYPE` | `IMAGE_HOST_TYPE` | `"freeimage"` | **代码零引用** |
@@ -2939,7 +2939,7 @@ grep -n "status_code in (\|!= 500" tests/*.py   # 本轮之后：0 命中
 8. **过时文档的两处，不要被误导。**
    - `docs/DEVELOPMENT.md` 的「测试策略」段声称存在 `test_core.py` / `test_api.py` / `test_gui.py`——**这三个文件不存在**，真实清单见本文 §6.1。
    - 本文的**旧版 §6** 声称「7 个测试文件」，同样过时——以当前 §6.1 的 20 个测试文件 + `conftest.py`、362 条用例为准。
-9. **版本号两处不同步**：`pyproject.toml` 为 `2.0.0`，`src/config/__init__.py` 的 `__version__` 与 `GUI_VERSION` 默认值为 `1.4.5`。写涉及版本断言的测试时先确认读的是哪一个，别硬编码。
+9. **版本号已统一为 `2.0.0`**：`pyproject.toml` 的 `version`、`src/config/__init__.py` 的 `__version__`、`GUI_VERSION` 默认值三处此前不一致（`2.0.0` / `1.4.5` / `1.4.5`），v2.0.0 发布前已对齐，写涉及版本断言的测试时三处读到的都是同一个值。
 
 ---
 

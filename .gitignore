@@ -4,9 +4,10 @@ __pycache__/
 *$py.class
 *.so
 .Python
+# PyInstaller / 打包产物
 build/
-develop-eggs/
 dist/
+release/
 downloads/
 eggs/
 .eggs/
@@ -66,6 +67,9 @@ static/settings.json
 # PyInstaller
 *.manifest
 *.spec
+# 但打包配置要进仓库：PyInstaller 默认在项目根生成临时 .spec，
+# 我们用 packaging/ 下这份受版本控制的主副本。
+!packaging/*.spec
 
 # Test coverage
 htmlcov/

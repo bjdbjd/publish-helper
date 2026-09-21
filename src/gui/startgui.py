@@ -35,10 +35,17 @@ get_name_tv_success = False
 get_name_tv_failure_number = 0
 
 
+def _app_icon() -> QIcon:
+    """应用图标。用 config.STATIC_DIR 而非相对路径：打包/换目录启动时 cwd 不保证是项目根，
+    相对路径会让 QIcon 静默拿到空图标（不报错，只是窗口没图标）。"""
+    from src.config.settings import config
+    return QIcon(str(config.STATIC_DIR / 'ph-bjd.ico'))
+
+
 def start_gui():
     gui = QApplication(sys.argv)
     my_mainwindow = mainwindow()
-    my_ico = QIcon('static/ph-bjd.ico')
+    my_ico = _app_icon()
     my_mainwindow.setWindowIcon(my_ico)
     my_mainwindow.show()
     sys.exit(gui.exec())
@@ -175,7 +182,7 @@ class mainwindow(QMainWindow, Ui_Mainwindow):
     def settings_clicked(self):  # click对应的槽函数
         self.my_settings = settings()
         self.my_settings.getSettings()
-        my_ico = QIcon('static/ph-bjd.ico')
+        my_ico = _app_icon()
         self.my_settings.setWindowIcon(my_ico)
         self.my_settings.show()  # 加上self避免页面一闪而过
 
