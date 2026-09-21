@@ -88,6 +88,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || inputs.upload_release
     runs-on: ubuntu-latest
     steps:
+      # 必须 checkout：body_path 指向仓库内的 packaging/RELEASE_NOTES.md，
+      # 而本 job 是独立的新 runner。缺这一步会以
+      # "Failed to read body_path ... (ENOENT)" 静默降级成空发布说明。
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -96,9 +101,15 @@ jobs:
       - name: List collected assets
         run: ls -la artifacts/
 
+      - name: Fail loudly if release notes are missing
+        run: |
+          test -s packaging/RELEASE_NOTES.md || {
+            echo "::error::packaging/RELEASE_NOTES.md 缺失或为空，拒绝创建空说明的 Release"; exit 1; }
+
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: Publish Helper v${{ github.ref_name }}
           files: artifacts/*.zip
           draft: true
           generate_release_notes: false
