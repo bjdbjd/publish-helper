@@ -87,7 +87,7 @@ def find_built_artifact() -> Path:
 
 
 def make_zip(artifact: Path, version: str) -> Path:
-    """把产物 + LICENSE + 使用说明打进 release/ 下的 zip。"""
+    """把产物 + 随包只读数据 + LICENSE + 使用说明打进 release/ 下的 zip。"""
     RELEASE.mkdir(parents=True, exist_ok=True)
     tag = platform_tag()
     out = RELEASE / f"Publish.Helper.v{version}.{tag}.zip"
@@ -101,6 +101,21 @@ def make_zip(artifact: Path, version: str) -> Path:
         shutil.copytree(artifact, stage / artifact.name, symlinks=True)
     else:
         shutil.copy2(artifact, stage / artifact.name)
+
+    # 随包只读数据：static/ 里的「非设置」文件（图标 + 数据 json）。
+    # 这些是应用运行时必需的只读资源，必须物理存在于 exe 同级。
+    # 特别注意 **排除了 settings.json**：那是用户配置档，不该随安装包分发，
+    # 否则重解压会覆盖用户已改的 PT-Gen 地址/密钥（见首次运行必读.txt）。
+    _STATIC_READONLY = {"ph-bjd.ico", "abbreviation.json", "combo-box-data.json",
+                        "picture-bed-data.json"}
+    static_src = ROOT / "static"
+    if static_src.is_dir():
+        stage_static = stage / "static"
+        stage_static.mkdir(parents=True, exist_ok=True)
+        for f in _STATIC_READONLY:
+            p = static_src / f
+            if p.is_file():
+                shutil.copy2(p, stage_static / f)
 
     for extra, target in [
         (ROOT / "LICENSE", "LICENSE"),
