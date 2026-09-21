@@ -16,6 +16,10 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
+      tag:
+        description: '要构建/发布的 tag（留空则用当前 ref）。用于重跑既有 tag 的 Release，无需强推 tag。'
+        required: false
+        default: ''
       upload_release:
         description: '构建后创建/更新 GitHub Release'
         type: boolean
@@ -43,7 +47,11 @@ jobs:
             artifact: 'Publish Helper'
 
     steps:
+      # 显式指定 ref：手动 dispatch 带 tag 入参时构建的是那个 tag 的代码，
+      # 而不是触发时所在分支的顶端。
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - uses: actions/setup-python@v5
         with:
@@ -85,13 +93,16 @@ jobs:
   release:
     name: Publish Release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v') || inputs.upload_release
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.tag != '' || inputs.upload_release
     runs-on: ubuntu-latest
     steps:
       # 必须 checkout：body_path 指向仓库内的 packaging/RELEASE_NOTES.md，
       # 而本 job 是独立的新 runner。缺这一步会以
       # "Failed to read body_path ... (ENOENT)" 静默降级成空发布说明。
+      # 取与 build 相同的 ref，保证说明文件与产物同源。
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -109,7 +120,9 @@ jobs:
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Publish Helper v${{ github.ref_name }}
+          # tag_name 用入参（手动重跑既有 tag 的场景），否则用触发 ref。
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: Publish Helper ${{ inputs.tag || github.ref_name }}
           files: artifacts/*.zip
           draft: true
           generate_release_notes: false
