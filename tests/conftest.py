@@ -142,3 +142,40 @@ class FakeResponse:
     def raise_for_status(self):
         if self.status_code >= 400:
             raise Exception(f"HTTP {self.status_code}")
+
+
+# ----------------------------------------------------------------------------
+# API 层 fixtures
+# ----------------------------------------------------------------------------
+
+
+@pytest.fixture
+def api_client():
+    """Flask test client for src.api.startapi routes."""
+    from src.api.startapi import api
+    return api.test_client()
+
+
+@pytest.fixture
+def media_file(tmp_path, monkeypatch):
+    """Isolated cwd with a placeholder media file for path-existence checks.
+
+    chdir 到 tmp 并建 tmp/media/视频.mkv，使 combine_directories('media') 命中 tmp，
+    且 `path` 送入存在文件时 os.path.exists 通过。用于媒体类 API 路由的 mock 成功路径。
+    """
+    monkeypatch.chdir(tmp_path)
+    media_dir = tmp_path / "media"
+    media_dir.mkdir(parents=True, exist_ok=True)
+    f = media_dir / "视频.mkv"
+    f.write_bytes(b"placeholder")
+    return f
+
+
+@pytest.fixture
+def real_media():
+    """Absolute path to the real 47MB sample media file in repo media/.
+
+    用于少数真实冒烟路由（getMediaInfo 等）；api 路由内部经 combine_directories('media')
+    拼接，需从项目根调用（fixture 不 chdir，保持 pytest 默认 cwd=项目根）。
+    """
+    return "media/测试媒体文件.mp4"

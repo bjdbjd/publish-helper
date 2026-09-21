@@ -78,3 +78,41 @@ class TestSettingsManager:
         value = temp_settings_manager.get_setting("test_template")
         assert "{categories}" in value
         assert "{category}" not in value
+
+
+class TestConfigHelperMethods:
+    """Test Config helper methods (get_temp_pic_dir/torrent_dir/is_development)."""
+
+    def test_get_temp_pic_dir(self):
+        from src.config import settings
+        # BASE_DIR 硬编码为项目根（不读 env），改用现有配置单例
+        assert settings.config.get_temp_pic_dir() == settings.config.TEMP_DIR / "pic"
+        assert settings.config.get_temp_pic_dir().exists()
+
+    def test_get_temp_torrent_dir(self):
+        from src.config import settings
+        assert settings.config.get_temp_torrent_dir() == settings.config.TEMP_DIR / "torrent"
+        assert settings.config.get_temp_torrent_dir().exists()
+
+    def test_is_development_default_false(self, monkeypatch):
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
+        from src.config import settings
+        assert settings.config.is_development() is False
+
+    def test_is_development_env(self, monkeypatch):
+        monkeypatch.setenv("ENVIRONMENT", "development")
+        from src.config import settings
+        assert settings.config.is_development() is True
+
+
+class TestImageHostConfig:
+    def test_get_host_config(self):
+        from src.config.settings import ImageHostConfig
+        cfg = ImageHostConfig.get_host_config("freeimage")
+        assert cfg["api_url"] == "https://freeimage.host/api/1/upload"
+
+    def test_get_supported_hosts(self):
+        from src.config.settings import ImageHostConfig
+        hosts = ImageHostConfig.get_supported_hosts()
+        assert "freeimage" in hosts
+        assert "imgbb" in hosts

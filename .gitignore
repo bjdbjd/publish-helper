@@ -54,6 +54,11 @@ temp/
 src/static/
 src/temp/
 
+# 测试用本地媒体样本（不入仓库）
+media/*.mp4
+media/*.mkv
+media/*.avi
+
 # Configuration (but keep examples)
 .env
 static/settings.json

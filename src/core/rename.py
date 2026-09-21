@@ -390,6 +390,7 @@ def load_min_widths_from_json(filepath: str = 'static/abbreviation.json') -> Dic
         # 如果 'min_widths' 键不存在或者在尝试读取文件时出现了错误，更新数据并写回文件
         if 'min_widths' not in data:
             data['min_widths'] = default_min_widths
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
             with open(filepath, 'w', encoding='utf-8') as file:
                 json.dump(data, file, indent=4)
 
