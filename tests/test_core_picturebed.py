@@ -95,12 +95,29 @@ class TestGenerateImageFilename:
     def test_fixed_random_digits(self, tmp_path, monkeypatch):
         import re
         # mock random.sample 返回固定 6 位数字
-        monkeypatch.setattr(random, "sample", lambda seq, k: ["0", "0", "1", "2", "3", "4"])
+        monkeypatch.setattr(random, "sample", lambda seq, k: ["0", "1", "2", "3", "4", "5"])
         path = generate_image_filename(str(tmp_path))
         assert path.startswith(str(tmp_path) + "/")
         fname = path.rsplit("/", 1)[1]
-        # 格式 %Y%m%d-%H%M%S-<6位随机数>.png；mock 返回 0,0,1,2,3,4 → 001234
-        assert re.fullmatch(r"\d{8}-\d{6}-001234\.png", fname)
+        # 格式 %Y%m%d-%H%M%S-<6位随机数>.png
+        assert re.fullmatch(r"\d{8}-\d{6}-012345\.png", fname)
+
+    def test_real_sample_has_six_distinct_digits(self, tmp_path):
+        """不 mock：断言真实 random.sample 的语义——6 位数字互不相同。
+
+        原先的用例 mock 成 ["0","0","1","2","3","4"]，恰好断言了一个
+        random.sample（无放回）永远不可能产生的值，把这条活契约擦掉了。
+        """
+        import re
+        from collections import Counter
+        path = generate_image_filename(str(tmp_path))
+        fname = path.rsplit("/", 1)[1]
+        m = re.fullmatch(r"\d{8}-\d{6}-(\d{6})\.png", fname)
+        assert m, f"文件名格式不符: {fname}"
+        digits = m.group(1)
+        assert not [d for d, n in Counter(digits).items() if n > 1], (
+            f"6 位随机数出现重复位（random.sample 无放回，不应重复）: {digits}"
+        )
 
 
 # ------------------------------------------------------------------ providers

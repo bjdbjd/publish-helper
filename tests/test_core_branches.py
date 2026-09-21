@@ -1,7 +1,7 @@
 """Tests for uncovered branches across core modules and utils.file_utils.
 
 补 test_core_*.py 未覆盖的分支：
-- ptgen 映射表逐分支（分辨率/音频/视频/媒介/类别/产地）+ ❁ 译名重构/签名前插/异常；
+- ptgen 映射表逐分支（分辨率/音频/视频/媒介/类别/产地）+ ❁ 译名重构/异常；
 - rename 季数正则其余分支、load_min_widths_from_json 异常、create_hard_link 错误、get_video_info OSError、rename_file OSError；
 - data 异常分支、get_abbreviation 异常；
 - settings_tool ConfigurationError / update_all / reset / 模块级函数；
@@ -9,6 +9,9 @@
 - mediainfo Text track 输出；
 - torrent 通用异常；
 - file_utils copy_with_structure/create_hardlink/find_files/combine_directories。
+
+注：docstring 提到但实际未覆盖的项已删除——原声明含「签名前插」，
+该分支的断言在 `test_core_ptgen.py`（`personalized_signature` 用例），不在本文件。
 """
 
 import errno
@@ -221,16 +224,21 @@ class TestCreateHardLinkErrors:
         assert ok is False
         assert "Permission denied" in msg
 
-    def test_unsupported_path_type(self, tmp_path):
-        # 既不是文件也不是目录 → 用 /dev/null 类型等价物：直接构造不存在则已测，改测非 regular？
-        # 构造一个已存在但既不是文件也不是目录的难；用 mock os.path 分支. 跳过——用 exists=True + isfile/isdir False
+    def test_unsupported_path_type(self, tmp_path, monkeypatch):
+        """路径存在但既非文件也非目录 → (False, 'Unsupported path type: ...')。
+
+        正常文件系统造不出这种节点，用 monkeypatch 让 exists=True 而
+        isfile/isdir 全 False 来命中该分支（原先这里是 assert True 空断言）。
+        """
         import src.core.rename as rename_mod
-        class _P:
-            pass
-        monkeypatch = None
-        # 简化：不构造这种边界，create_hard_link 的 Unsupported 分支在正常 FS 难触发，
-        # 放弃该分支断言（文档记录即可）。
-        assert True
+
+        monkeypatch.setattr(rename_mod.os.path, "exists", lambda p: True)
+        monkeypatch.setattr(rename_mod.os.path, "isfile", lambda p: False)
+        monkeypatch.setattr(rename_mod.os.path, "isdir", lambda p: False)
+        target = str(tmp_path / "weird-node")
+        ok, msg = create_hard_link(target)
+        assert ok is False
+        assert msg == f"Unsupported path type: {target}"
 
 
 class TestGetVideoInfoOSError:

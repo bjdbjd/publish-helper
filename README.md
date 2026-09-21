@@ -222,7 +222,8 @@ publish-helper/
 ## 📚 文档
 
 - 📖 [开发者指南](docs/DEVELOPMENT.md) - 详细的开发文档
-- 🔧 [重构说明](docs/FORK_PROPOSAL.md) - 重构内容和改进说明
+- 🧭 [业务逻辑与测试要点](docs/BUSINESS_LOGIC.md) - 核心模块契约、API 路由、GUI/CLI 流程与测试覆盖矩阵（写测试先读这份）
+- 🔧 [重构说明](docs/FORK_PROPOSAL.md) - 重构内容和改进说明（历史快照，见文首状态标注）
 - 🐳 [Docker部署](deploy/docker-compose.yml) - 容器化部署指南
 - ⚙️ [配置参考](.env.example) - 完整的配置选项
 

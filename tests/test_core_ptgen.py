@@ -47,6 +47,25 @@ class TestNormPtgenUrl:
     def test_old_api_kept(self):
         assert _norm_ptgen_url("https://ptgen.agsvpt.work/") == "https://ptgen.agsvpt.work"
 
+    def test_missing_scheme_yields_single_api_path(self):
+        """缺 scheme 时只取第一段作为 host，不再拼出双 `/api/getData`。"""
+        assert (
+            _norm_ptgen_url("pt-gen.hares.dpdns.org/api/getData")
+            == "https://pt-gen.hares.dpdns.org/api/getData"
+        )
+        assert (
+            _norm_ptgen_url("pt-gen.hares.dpdns.org/api")
+            == "https://pt-gen.hares.dpdns.org/api/getData"
+        )
+
+    def test_bare_host_without_scheme_not_rewritten(self):
+        """裸域名（无 scheme、无 `/api`）不被判为新版接口 → 原样返回。
+
+        `_is_new_pt_gen_api` 用 `urlsplit(...).hostname`，对无 scheme 输入
+        返回 `None`，故不命中 `_NEW_PTGEN_HOSTS`。这是既有行为，不是修复目标。
+        """
+        assert _norm_ptgen_url("pt-gen.hares.dpdns.org") == "pt-gen.hares.dpdns.org"
+
 
 class TestAuthSignature:
     def test_base64url_no_padding(self, monkeypatch):
@@ -194,6 +213,41 @@ class TestGetDataFromPtGenDescription:
         desc = "◎类　　别　纪录片\n"
         _, _, category, *_ = get_data_from_pt_gen_description("", desc, "", "WEB-DL", "电影")
         assert category == "纪录"
+
+    # ------------------------------------------------------------ 480P bug 与并列覆盖
+
+    def test_480P_maps_to_480p(self):
+        """`480P`（大写 P）应为 `480p`。
+
+        修复前 `480i` 分支的条件多写了一个 `'480P'`，紧跟 `480p` 分支之后
+        必然覆盖它，导致 `Movie.2020.480P.x264` 被标成隔行。
+        """
+        fmt = lambda t: get_data_from_pt_gen_description(t, "", "", "", "")[4]
+        assert fmt("Movie.2020.480P.x264") == "480p"
+        assert fmt("Movie.2020.480p.x264") == "480p"
+        assert fmt("Movie.2020.480i.x264") == "480i"
+
+    def test_mapping_tables_are_last_match_wins(self):
+        """六张映射表都是并列 `if`，**最后命中者胜**，不是互斥查表。
+
+        这一结构性事实此前的用例全部只做「单值命中」，没锁住覆盖行为。
+        """
+        gd = get_data_from_pt_gen_description
+        # category：同时含 纪录 与 动画 → 取后者（声明顺序靠后）
+        assert gd("x", "◎类　　别　纪录 动画\n", "", "", "")[2] == "动画"
+        # 短片 → 短剧
+        assert gd("x", "◎类　　别　短片\n", "", "", "")[2] == "短剧"
+        # area：同时含 大陆 与 香港 → 取港台
+        assert gd("x", "◎产　　地　大陆 香港\n", "", "", "")[3] == "港台"
+        # area：美国 + 英国 → 都归欧美
+        assert gd("x", "◎产　　地　美国 英国\n", "", "", "")[3] == "欧美"
+        # audio：`AAC` 与 `DD` 同时出现 → AC3 后置胜出
+        assert gd("Movie.AAC.DD", "", "", "", "")[5] == "AC3"
+
+    def test_imdb_regex_requires_trailing_slash(self):
+        """IMDb/豆瓣正则要求 URL 以 `/` 结尾，否则为空串。"""
+        desc = "◎简　　介　https://www.imdb.com/title/tt1234567 无尾斜杠"
+        assert get_data_from_pt_gen_description("", desc, "", "", "")[0] == ""
 
     def test_resolution_4k(self):
         _, _, _, _, video_format, *_ = get_data_from_pt_gen_description("Title 2160p", "", "", "WEB-DL", "电影")

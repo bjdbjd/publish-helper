@@ -104,6 +104,18 @@ class TestChineseToInt:
         assert chinese_to_int("abc") is None
         assert chinese_to_int("") is None
 
+    def test_wan_unit(self):
+        """「万」按节进位。此前 `unit_map` 有「万」但算法不做节分隔，
+        `十二万` 会得 20010、`十万` 得 10010（bug，已修）。"""
+        assert chinese_to_int("十二万") == 120000
+        assert chinese_to_int("十万") == 100000
+        assert chinese_to_int("一万") == 10000
+        assert chinese_to_int("三万五千") == 35000
+
+    def test_yi_not_supported(self):
+        """「亿」未实现 → 非法字符 → None（与「万」不同，见 §2.10 说明）。"""
+        assert chinese_to_int("一亿") is None
+
 
 class TestBase64Encoding:
     def test_roundtrip(self):
@@ -139,6 +151,17 @@ class TestConvertChinesePunctuation:
 
     def test_parens(self):
         assert convert_chinese_punctuation_to_english("（注）") == " (注) "
+
+    def test_single_quote_curly(self):
+        """中文单引号映射为半角单引号（与 `“”` 一样不区分开闭）。
+
+        `text.py:44-45` 原写作 `'‘': ''',  # comment`，`''',` 被词法器当成
+        三引号字符串的开启标记，导致 `‘` 的值变成注释文本、`’` 根本不是字典键。
+        已修复；本用例锁定修复后的行为。
+        """
+        assert convert_chinese_punctuation_to_english("A’B") == "A'B"
+        assert convert_chinese_punctuation_to_english("‘A") == "'A"
+        assert convert_chinese_punctuation_to_english("‘引号’") == "'引号'"
 
 
 class TestChineseNameToPinyin:

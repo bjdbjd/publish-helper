@@ -1,5 +1,12 @@
 # 🚀 Publish Helper 2.0 - 企业级重构提案
 
+> **状态标注（2026-09-21 补记）**：本文是**分叉当时**的提案，描述的是**当时的目标状态**，不是当前现状。
+> 阅读时请注意两处已失真的内容：
+> 1. **§代码质量指标**里「测试覆盖 0% → **80%+**」不成立。实测（`pytest --cov=src`）全量为 **36%**；剔除 GUI/CLI/入口/`autoHandleVideo` 后的有效口径约 **85%**。当前真实覆盖矩阵见 [BUSINESS_LOGIC.md §6](BUSINESS_LOGIC.md)。
+> 2. **§文档系统**里的 `REFACTOR_SUMMARY.md` **不存在**（文件已不在仓库中）。
+>
+> 重构本身已完成，落地情况见 [REFACTORING_PLAN.md](REFACTORING_PLAN.md)（该文件带 ✅ 进度标记与 commit 号）。
+
 ## 📋 重构概述
 
 本项目是对原 [publish-helper](https://github.com/bjdbjd/publish-helper) 重构
@@ -203,7 +210,7 @@ services:
 **新增文档：**
 
 - 📖 [开发者指南](DEVELOPMENT.md)
-- 🔧 [重构总结](REFACTOR_SUMMARY.md)
+- 🔧 [重构总结（文件已不存在）](REFACTOR_SUMMARY.md)
 - ⚙️ [配置说明](../.env.example)
 - 🐳 [Docker文档](../deploy/docker-compose.yml)
 

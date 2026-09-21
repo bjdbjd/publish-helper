@@ -143,6 +143,71 @@ class TestGetVideoInfo:
         assert "中字" in info[8]
         assert "英字" in info[8]
 
+    def test_zero_audio_tracks_gives_0audio(self, fake_mediainfo, monkeypatch):
+        """无音轨 → `audio_num == '0Audio'`（1 与 2 都已测，唯独 0 没有）。"""
+        import src.core.rename as rename_mod
+        import tempfile
+        holder = {}
+        holder["tracks"] = [
+            make_track("Video", other_width=["1 920 pixels"], other_height=["1 080 pixels"],
+                       other_format=["AVC"],
+                       other_hdr_format=[""], other_bit_depth=[""], writing_library=""),
+        ]
+
+        class _Fake:
+            @property
+            def tracks(self):
+                return holder["tracks"]
+            def to_json(self):
+                import json
+                return json.dumps({"tracks": [t.__dict__ for t in holder["tracks"]]})
+
+        monkeypatch.setattr(rename_mod.MediaInfo, "parse", staticmethod(lambda path: _Fake()))
+        p = tempfile.mktemp(suffix=".mkv"); open(p, "w").close()
+        try:
+            ok, info = get_video_info(p)
+        finally:
+            os.remove(p)
+        assert ok is True
+        assert info[7] == "0Audio"
+
+    def test_two_video_tracks_concatenate_bug(self, fake_mediainfo, monkeypatch):
+        """两条 Video track → 字段被 `+=` 串联，产生失真值（按现状断言）。
+
+        `width/height/video_codec` 都是 `+=` 累加，故两条 track 的像素串会被
+        `extract_numbers` 拼成一个数字（1 920 + 1 280 → 19201280）→ 分辨率落到
+        `8640p`，codec 变成 `'AVCHEVC'`。这是缺陷现状，不是预期行为。
+        """
+        import src.core.rename as rename_mod
+        import tempfile
+        holder = {}
+        holder["tracks"] = [
+            make_track("Video", other_width=["1 920 pixels"], other_height=["1 080 pixels"],
+                       other_format=["AVC"],
+                       other_hdr_format=[""], other_bit_depth=[""], writing_library=""),
+            make_track("Video", other_width=["1 280 pixels"], other_height=["720 pixels"],
+                       other_format=["HEVC"],
+                       other_hdr_format=[""], other_bit_depth=[""], writing_library=""),
+        ]
+
+        class _Fake:
+            @property
+            def tracks(self):
+                return holder["tracks"]
+            def to_json(self):
+                import json
+                return json.dumps({"tracks": [t.__dict__ for t in holder["tracks"]]})
+
+        monkeypatch.setattr(rename_mod.MediaInfo, "parse", staticmethod(lambda path: _Fake()))
+        p = tempfile.mktemp(suffix=".mkv"); open(p, "w").close()
+        try:
+            ok, info = get_video_info(p)
+        finally:
+            os.remove(p)
+        assert ok is True
+        assert info[1] == "AVCHEVC", "两条 Video track 的 codec 被串联"
+        assert info[0] == "8640p", "像素串被拼接后落到 8640p"
+
     def test_portrait_height_gt_width_uses_height(self, fake_mediainfo, monkeypatch):
         # 修复：height 检查错写（other_width→other_height）导致竖屏资源误标分辨率
         import src.core.rename as rename_mod
@@ -212,6 +277,24 @@ class TestGetNameFromTemplate:
         assert "类型：动作" in name
         assert "演员：演员A" in name
 
+    def test_missing_template_key_raises_attributeerror(self, mock_settings):
+        """模板键不存在 → `get_settings` 返回 None → `None.replace` 抛 AttributeError。
+
+        `template` 是**最后一个位置参数**，21 个占位实参必须凑齐。
+        """
+        mock_settings.patch("src.core.rename")
+        with pytest.raises(AttributeError):
+            get_name_from_template(*([""] * 21), "no_such_key_xyz")
+
+    def test_empty_template_raises_indexerror(self, mock_settings, monkeypatch):
+        """模板为空串 → 末尾 `name[0]` 抛 IndexError。"""
+        import src.core.rename as rename_mod
+
+        mock_settings.patch("src.core.rename")
+        monkeypatch.setattr(rename_mod, "get_settings", lambda key, *a, **kw: "")
+        with pytest.raises(IndexError):
+            get_name_from_template(*([""] * 21), "main_title_movie")
+
 
 # ---------------------------------------------------------------- file operations
 
@@ -226,6 +309,23 @@ class TestRenameFile:
         assert new.endswith(".mkv")
         assert "b.new_name.mkv" in new
         assert (tmp_path / "b.new_name.mkv").exists()
+
+    def test_new_name_with_extension_not_duplicated(self, tmp_path):
+        """新名自带同名扩展名时不再叠加（S9c，已修）。"""
+        f = tmp_path / "a.mkv"
+        f.write_bytes(b"x")
+        ok, new = rename_file(str(f), "z.mkv")
+        assert ok is True
+        assert new.endswith("z.mkv")
+        assert not new.endswith(".mkv.mkv")
+        assert (tmp_path / "z.mkv").exists()
+
+    def test_new_name_without_extension_gets_original(self, tmp_path):
+        f = tmp_path / "a.mkv"
+        f.write_bytes(b"x")
+        ok, new = rename_file(str(f), "plain")
+        assert ok is True
+        assert new.endswith("plain.mkv")
 
     def test_missing_file_error(self, tmp_path):
         ok, payload = rename_file(str(tmp_path / "ghost.mkv"), "x")

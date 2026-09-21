@@ -22,12 +22,43 @@ def _set(monkeypatch, name, value):
 
 
 class TestGetScreenshot:
-    def test_missing_path_no_crash(self, api_client, monkeypatch, media_file):
-        # 空 path 被 join 到 media 根（缺参 422 死分支），mock 成功链验证不抛 500
+    def test_number_above_max_is_value_range_error(self, api_client, media_file):
+        """screenshotNumber > 5 → 422 VALUE_RANGE_ERROR（该分支此前零覆盖）。"""
+        r = api_client.get("/api/getScreenshot?path=视频.mkv&screenshotNumber=99")
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "VALUE_RANGE_ERROR"
+        assert "不能大于5张" in r.get_json()["message"]
+
+    def test_number_below_min_is_value_range_error(self, api_client, media_file):
+        r = api_client.get("/api/getScreenshot?path=视频.mkv&screenshotNumber=0")
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "VALUE_RANGE_ERROR"
+        assert "不能小于1张" in r.get_json()["message"]
+
+    def test_start_after_end_is_value_relationship_error(self, api_client, media_file):
+        r = api_client.get(
+            "/api/getScreenshot?path=视频.mkv&screenshotStartPercentage=0.9"
+            "&screenshotEndPercentage=0.1"
+        )
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "VALUE_RELATIONSHIP_ERROR"
+        assert "不能大于终止点" in r.get_json()["message"]
+
+    def test_percentage_out_of_range(self, api_client, media_file):
+        r = api_client.get(
+            "/api/getScreenshot?path=视频.mkv&screenshotStartPercentage=5"
+            "&screenshotEndPercentage=0.1"
+        )
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "VALUE_RANGE_ERROR"
+        assert "不能小于0或大于1" in r.get_json()["message"]
+
+    def test_missing_path_is_422(self, api_client, monkeypatch, media_file):
+        """空 path → 422 MISSING_REQUIRED_PARAMETER（该分支此前因先 abspath 而是死代码）。"""
         _set(monkeypatch, "get_screenshot", lambda *a, **k: (True, ["pic.png"]))
-        _set(monkeypatch, "check_path_and_find_video", lambda p: (2, str(media_file)))
         r = api_client.get("/api/getScreenshot")
-        assert r.status_code != 500
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
     def test_unauthorized(self, api_client, media_file):
         # 越域路径：../etc/passwd join 到 media 后 abspath 不 startswith media → 401
@@ -45,11 +76,31 @@ class TestGetScreenshot:
 
 
 class TestGetThumbnail:
-    def test_missing_path_no_crash(self, api_client, monkeypatch, media_file):
+    def test_rows_zero_is_value_range_error(self, api_client, media_file):
+        """thumbnailRows=0 → 422 VALUE_RANGE_ERROR。
+
+        该校验在 `check_path_and_find_video` **之前**，无需 mock 即可命中。
+        """
+        r = api_client.get("/api/getThumbnail?path=视频.mkv&thumbnailRows=0&thumbnailCols=3")
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "VALUE_RANGE_ERROR"
+        assert "大于0" in r.get_json()["message"]
+
+    def test_start_after_end_is_value_relationship_error(self, api_client, monkeypatch, media_file):
+        """start>end 的校验在后置，需先让 check_path 通过（否则被 422 FILE_PATH_ERROR 抢先）。"""
+        _set(monkeypatch, "check_path_and_find_video", lambda p: (1, str(media_file)))
+        r = api_client.get(
+            "/api/getThumbnail?path=视频.mkv&thumbnailRows=3&thumbnailCols=3"
+            "&screenshotStartPercentage=0.9&screenshotEndPercentage=0.1"
+        )
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "VALUE_RELATIONSHIP_ERROR"
+
+    def test_missing_path_is_422(self, api_client, monkeypatch, media_file):
         _set(monkeypatch, "get_thumbnail", lambda *a, **k: (True, "thumb.png"))
-        _set(monkeypatch, "check_path_and_find_video", lambda p: (2, str(media_file)))
         r = api_client.get("/api/getThumbnail")
-        assert r.status_code != 500
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
     def test_unauthorized(self, api_client, media_file):
         r = api_client.get("/api/getThumbnail", query_string={"path": "../etc/passwd"})
@@ -92,12 +143,12 @@ class TestGetMediaInfo:
         r = api_client.get("/api/getMediaInfo", query_string={"path": "../etc/passwd"})
         assert r.status_code == 401
 
-    def test_missing_path_no_crash(self, api_client, monkeypatch, media_file):
-        # 空 path join 到 media 根（缺参 422 死分支），mock 成功链路验证不崩
+    def test_missing_path_is_422(self, api_client, monkeypatch, media_file):
+        """空 path → 422 MISSING_REQUIRED_PARAMETER（该分支此前因先 abspath 而是死代码）。"""
         _set(monkeypatch, "get_media_info", lambda *a, **k: (True, "General\n..."))
-        _set(monkeypatch, "check_path_and_find_video", lambda p: (2, str(media_file)))
         r = api_client.get("/api/getMediaInfo")
-        assert r.status_code != 500
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
     def test_file_not_exists(self, api_client, media_file):
         r = api_client.get("/api/getMediaInfo", query_string={"path": "ghost.mkv"})
@@ -120,9 +171,9 @@ class TestGetVideoInfo:
     def test_missing_path_no_crash(self, api_client, monkeypatch, media_file):
         info = ["1080p", "x264", "10bit", "HDR10", "", "DDP", "5.1", "", []]
         _set(monkeypatch, "get_video_info", lambda *a, **k: (True, info))
-        _set(monkeypatch, "check_path_and_find_video", lambda p: (1, str(media_file)))
         r = api_client.get("/api/getVideoInfo")
-        assert r.status_code != 500
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
     def test_success(self, api_client, monkeypatch, media_file):
         info = ["1080p", "x264", "10bit", "HDR10", "", "DDP", "5.1", "", ["国语"]]
@@ -170,13 +221,13 @@ class TestGetPlayletDescription:
 
 
 class TestGetPtGenInfo:
-    def test_missing_description_bug(self, api_client):
-        # 已知 bug：message/statusCode 互换
+    def test_missing_description(self, api_client):
+        # S6 已修：message 与 statusCode 不再互换
         r = api_client.get("/api/getPtGenInfo")
         assert r.status_code == 422
         body = r.get_json()
-        assert body["message"] == "MISSING_REQUIRED_PARAMETER"
-        assert body["statusCode"] == "缺少PT-Gen简介内容。"
+        assert body["message"] == "缺少PT-Gen简介内容。"
+        assert body["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
     def test_success(self, api_client, monkeypatch):
         parsed = ("原", "英", "2020", [], "动作", ["张三"], None, None)
@@ -193,11 +244,11 @@ class TestGetPtGenInfoByUrl:
         assert r.status_code == 422
 
     def test_success(self, api_client, monkeypatch):
-        from src.core.rename import get_pt_gen_info as real
         _set(monkeypatch, "get_pt_gen_info", lambda *a, **k: ("原", "英", "2020", [], "动作", [], None, None))
         _set(monkeypatch, "get_pt_gen_description", lambda *a, **k: (True, ("fmt", {"chinese_title": "原"})))
         r = api_client.get("/api/getPTGenInfoByResourceUrl", query_string={"resourceUrl": "tt1"})
         assert r.status_code == 200
+        # S8 的 description 元组 bug 由 tests/test_api_bug_locks.py 专测，此处只锁成功码
 
 
 class TestGetNameFromTemplate:
@@ -224,7 +275,8 @@ class TestGetNameFromTemplate:
 class TestRenameFolder:
     def test_missing_params(self, api_client, media_file):
         r = api_client.post("/api/renameFolder", json={"folderPath": ""})
-        assert r.status_code == 401 or r.status_code == 422
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
     def test_success(self, api_client, monkeypatch, media_file):
         _set(monkeypatch, "rename_folder", lambda *a, **k: (True, str(media_file.parent / "new")))
@@ -232,19 +284,22 @@ class TestRenameFolder:
             "/api/renameFolder",
             json={"folderPath": "视频.mkv", "newFolderName": "new"},
         )
-        # media_file 是占位，folderPath 不存在 → 422 FILE_PATH_ERROR（大副作用路由只要 mock 成功分支）
-        assert r.status_code in (200, 422)
+        # mock 掉 rename_folder 后走成功分支
+        assert r.status_code == 200
+        assert r.get_json()["statusCode"] == "OK"
 
 
 class TestRenameFile:
     def test_missing_params(self, api_client):
         r = api_client.post("/api/renameFile", json={"filePath": ""})
-        assert r.status_code in (401, 422)
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
     def test_success(self, api_client, monkeypatch, media_file):
         _set(monkeypatch, "rename_file", lambda *a, **k: (True, str(media_file)))
         r = api_client.post("/api/renameFile", json={"filePath": "视频.mkv", "newFileName": "n"})
-        assert r.status_code in (200, 422)
+        assert r.status_code == 200
+        assert r.get_json()["statusCode"] == "OK"
 
 
 class TestCreateHardLink:
@@ -252,32 +307,50 @@ class TestCreateHardLink:
         _set(monkeypatch, "create_hard_link", lambda *a, **k: (True, str(media_file) + "-hardlink"))
         _set(monkeypatch, "check_path_and_find_video", lambda p: (1, str(media_file)))
         r = api_client.post("/api/createHardLink", json={"path": str(media_file)})
-        assert r.status_code in (200, 422)
+        assert r.status_code == 200
+        assert r.get_json()["statusCode"] == "OK"
 
 
 class TestMoveFileToFolder:
-    def test_empty_filepath_hits_401_bug(self, api_client):
-        # 已知 bug：空 filePath 命中 401 而非 422（原始变量 startswith 检查）
+    def test_empty_filepath_is_422(self, api_client):
+        # S2 修复后：空 filePath 命中原本是死代码的 422 分支（不再是 401）
         r = api_client.post("/api/moveFileToFolder", json={"filePath": ""})
-        assert r.status_code == 401 or r.status_code == 422
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
     def test_missing_folder_name(self, api_client, media_file):
         r = api_client.post("/api/moveFileToFolder", json={"filePath": "视频.mkv", "folderName": ""})
-        assert r.status_code in (401, 422)
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
-    def test_success(self, api_client, monkeypatch, media_file):
+    def test_success_with_absolute_path(self, api_client, monkeypatch, media_file):
+        """绝对路径成功路径。"""
+        import os
+        dest = os.path.join(str(media_file.parent), "dest", media_file.name)
+        _set(monkeypatch, "move_file_to_folder", lambda *a, **k: (True, dest))
+        r = api_client.post(
+            "/api/moveFileToFolder",
+            json={"filePath": os.path.abspath(str(media_file)), "folderName": "dest"},
+        )
+        assert r.status_code == 200
+        assert r.get_json()["statusCode"] == "OK"
+
+    def test_relative_path_now_works(self, api_client, monkeypatch, media_file):
+        """S2 修复后相对路径不再被误判 401（详见 test_api_bug_locks.py）。"""
         _set(monkeypatch, "move_file_to_folder", lambda *a, **k: (True, str(media_file)))
         r = api_client.post(
             "/api/moveFileToFolder",
             json={"filePath": "视频.mkv", "folderName": "dest"},
         )
-        assert r.status_code in (200, 401, 422)
+        assert r.status_code == 200
+        assert r.get_json()["statusCode"] == "OK"
 
 
 class TestRenameEpisode:
     def test_missing_params(self, api_client):
         r = api_client.post("/api/renameEpisode", json={"folderPath": ""})
-        assert r.status_code in (401, 422)
+        assert r.status_code == 422
+        assert r.get_json()["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
     def test_file_path_rejected(self, api_client, monkeypatch, media_file):
         # check_path_and_find_video == 1（文件）→ 400 '不支持文件路径'
@@ -297,14 +370,16 @@ class TestRenameEpisode:
             "/api/renameEpisode",
             json={"folderPath": "视频.mkv", "newFileName": "ep{集数}", "episodeStartNumber": "1"},
         )
-        assert r.status_code == 200 or r.status_code == 400
+        assert r.status_code == 200
+        assert r.get_json()["statusCode"] == "OK"
 
 
 class TestGetTotalEpisode:
     def test_missing_path(self, api_client, media_file):
         r = api_client.get("/api/getTotalEpisode", query_string={"folderPath": "视频.mkv"})
-        # 文件夹不存在 → 422 FILE_PATH_ERROR（占位文件是文件不是文件夹）
-        assert r.status_code in (200, 400, 422)
+        # folderPath 指向一个**文件**而非目录 → 400 '不支持文件路径：...'
+        assert r.status_code == 400
+        assert r.get_json()["statusCode"] == "BACKEND_PROCESSING_ERROR"
 
     def test_success_all(self, api_client, monkeypatch, media_file):
         _set(monkeypatch, "check_path_and_find_video", lambda p: (2, str(media_file)))

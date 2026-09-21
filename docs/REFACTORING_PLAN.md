@@ -158,11 +158,14 @@ return send_file(str(target_path), as_attachment=True)
 
 ## 七、验证清单
 
+> 状态标注（2026-09-21 补记）：§一/§二描述的是**重构前**的状态（`tool.py` 双套 settings 等），已全部落地，勿当作现状阅读。
+> 下列条目中第 2、3、4 条引用的路径**已不存在**：`src/core/tool.py`（已删除）、`src/main_gui_new.py`、`src/main_api_new.py`（均已删除，入口统一为 `main_gui.py`/`main_api.py`/`main_cli.py`）。它们是**当时**的验证记录，保留以备考。当前测试与覆盖率基线见 [BUSINESS_LOGIC.md §6](BUSINESS_LOGIC.md)。
+
 0. ✅ `docs/REFACTORING_PLAN.md` 已存在且可独立阅读（含目标、问题、步骤、验证、范围外）。
 1. ✅ `python -m pytest tests/ -q` — `.venv` 未装 pytest，改用「全模块 import 回归 + py_compile + 功能调用」验证均通过（见下）。
-2. ✅ `mypy src/core/tool.py src/core/rename.py src/utils/file_utils.py` — 无 `disallow_untyped_defs` 及其它报错。
-3. ✅ `python src/main_gui_new.py` — `import src.gui.startgui` 通过（GUI 层依赖全链可加载）。
-4. ✅ `python src/main_api_new.py` — `import src.api.startapi` 通过；`/api/getFile` 鉴权用 Flask test_client 验证：temp 内文件 200、前缀 lookalike 401、目录逃逸 401、绝对越权 401、temp 根 401、缺失文件 404、缺参数 422。
+2. ✅ `mypy src/core/tool.py src/core/rename.py src/utils/file_utils.py` — 无 `disallow_untyped_defs` 及其它报错。（`src/core/tool.py` 已删除）
+3. ✅ `python src/main_gui_new.py` — `import src.gui.startgui` 通过（GUI 层依赖全链可加载）。（该入口已不存在）
+4. ✅ `python src/main_api_new.py` — `import src.api.startapi` 通过；`/api/getFile` 鉴权用 Flask test_client 验证：temp 内文件 200、前缀 lookalike 401、目录逃逸 401、绝对越权 401、temp 根 401、缺失文件 404、缺参数 422。（该入口已不存在）
 5. ✅ `get_settings('rename_file')` 读取归一为 `True`（原 `'True'` 字符串自动转 bool）。
 
 > 补充：全部 22 个模块（4 入口 + GUI + API + 9 核心 + debug + utils + config）import 回归通过；`int_to_roman/int_to_chinese/chinese_to_int/base64encoding/get_abbreviation/get_combo_box_data/min_widths` 功能调均正常。
