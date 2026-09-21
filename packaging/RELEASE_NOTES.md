@@ -112,13 +112,17 @@ PT 站提供的 auto_feed 地址，否则「一键上传」生成的链接无效
 
 ## 📦 产物
 
-| 平台 | 文件 |
-|---|---|
-| Windows x64 | `Publish.Helper.v2.0.0.windows-x64.zip`（内含 `Publish Helper.exe`） |
-| macOS arm64 | `Publish.Helper.v2.0.0.macos-arm64.zip`（内含 `Publish Helper.app`） |
-| Linux x64 | `Publish.Helper.v2.0.0.linux-x64.zip` |
+| 平台 | 文件 | 大小 |
+|---|---|---|
+| Windows x64 | `Publish.Helper.v2.0.0.windows-x64.zip`（内含 `Publish Helper.exe`） | 88.5 MB |
+| macOS arm64（Apple Silicon） | `Publish.Helper.v2.0.0.macos-arm64.zip`（内含 `Publish Helper.app`） | 73.0 MB |
+| Linux x64 | `Publish.Helper.v2.0.0.linux-x64.zip` | 144.6 MB |
 
 压缩包内附 **`首次运行必读.txt`**，含上述升级步骤与目录说明。
+
+> **macOS 说明**：当前仅提供 Apple Silicon（arm64）版本，面向 Intel Mac 的 x64 版本暂未提供。
+> 应用**未做代码签名/公证**，首次打开若被 Gatekeeper 拦截，请右键 → 打开，
+> 或执行 `xattr -dr com.apple.quarantine "Publish Helper.app"`。
 
 ### 服务端（Docker）
 
@@ -127,6 +131,10 @@ docker pull <your-registry>/publish-helper:2.0.0
 ```
 
 Linux 需系统库 `libmediainfo0v5` / `libzen0v5`（镜像内已装）。
+
+> 注：本次 Docker 镜像未随 Release 提供。当前构建环境无法访问 Docker Hub
+> 拉取基础镜像 `python:3.11.4-slim-bullseye`，需要能访问该镜像源的机器或镜像加速器
+> 执行 `docker build -f deploy/Dockerfile -t publish-helper:2.0.0 .`。
 
 ## 🧪 测试
 
