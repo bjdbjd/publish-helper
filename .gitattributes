@@ -1,0 +1,24 @@
+# 统一换行符为 LF（仓库内），避免 Windows 本地编辑把 CRLF 提交进来。
+#
+# 不这么做的实际后果：packaging/RELEASE_NOTES.md 带 CRLF 提交后，
+# CI 把它当作 Release 说明正文，GitHub 渲染出的换行变成字面 "\n" 文本。
+#
+# 注意：.bat/.cmd 必须保留 CRLF（Windows 批处理对 LF 不兼容），
+# 故在文件末尾单独放行，不要在此处用 * text=auto 覆盖。
+
+* text=auto eol=lf
+
+# 二进制文件不要做换行转换
+*.ico   binary
+*.dylib binary
+*.deb   binary
+*.png   binary
+*.jpg   binary
+*.exe   binary
+*.zip   binary
+*.7z    binary
+*.dat   binary
+
+# Windows 批处理必须是 CRLF
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
