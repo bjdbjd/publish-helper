@@ -96,13 +96,13 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || inputs.tag != '' || inputs.upload_release
     runs-on: ubuntu-latest
     steps:
-      # 必须 checkout：body_path 指向仓库内的 packaging/RELEASE_NOTES.md，
-      # 而本 job 是独立的新 runner。缺这一步会以
-      # "Failed to read body_path ... (ENOENT)" 静默降级成空发布说明。
-      # 取与 build 相同的 ref，保证说明文件与产物同源。
+      # 说明正文取**默认分支**，而不是 tag：tag 是不可变的，若说明里有格式
+      # 问题（例如曾出现的 CRLF 被渲染成字面 "\n"），改 tag 就得强推 ref。
+      # 二进制产物不来自 checkout，而是下面的 download-artifact，
+      # 因此这里用默认分支不会让产物与 tag 脱节。
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ github.event.repository.default_branch }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -116,6 +116,13 @@ jobs:
         run: |
           test -s packaging/RELEASE_NOTES.md || {
             echo "::error::packaging/RELEASE_NOTES.md 缺失或为空，拒绝创建空说明的 Release"; exit 1; }
+
+      - name: Reject CRLF in release notes
+        run: |
+          if grep -qU $'\r' packaging/RELEASE_NOTES.md; then
+            echo "::error::RELEASE_NOTES.md 含 CRLF，GitHub 会把 CR 渲染成字面 \\n。请改为 LF 后重跑。"
+            exit 1
+          fi
 
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
