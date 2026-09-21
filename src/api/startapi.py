@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import List
+from typing import Any, List, Tuple
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -68,18 +68,18 @@ def _error(status_code, message, http_status=400, data=None, exc=None):
 
 
 @api.errorhandler(404)
-def _handle_404(error):
+def _handle_404(error: Any) -> Any:
     """未注册路径也返回统一包络（Flask 默认是 HTML，客户端难以统一解析）。"""
     return _error('NOT_FOUND', '请求的资源不存在。', 404)
 
 
 @api.errorhandler(405)
-def _handle_405(error):
+def _handle_405(error: Any) -> Any:
     """方法不匹配也返回统一包络。"""
     return _error('METHOD_NOT_ALLOWED', '请求方法不被允许。', 405)
 
 
-def _resolve_media_path(raw_path):
+def _resolve_media_path(raw_path: str) -> Tuple[str, str]:
     """把请求参数 join 到 media 根并解析为绝对路径，返回 (abs_path, media_root)。
 
     调用方应随后用 `_is_within(abs_path, media_root)` 做边界判断，**不要**再用
@@ -90,7 +90,7 @@ def _resolve_media_path(raw_path):
     return os.path.abspath(os.path.join(media_path, raw_path)), media_path
 
 
-def _is_within(target_path, allowed_root):
+def _is_within(target_path: str, allowed_root: str) -> bool:
     """判断 target 是否在 allowed_root 之内（按路径分隔符边界，不是字符串前缀）。
 
     用 `os.path.commonpath` 比较，避免 `media_evil` 这类前缀 lookalike 通过。
@@ -106,7 +106,7 @@ def _is_within(target_path, allowed_root):
         return False
 
 
-def _to_media_relative(image_path, media_path):
+def _to_media_relative(image_path: Any, media_path: str) -> str:
     """把媒体相关路径裁成「相对 media 根」的形式。
 
     截图/缩略图的存储目录默认是 settings 里的相对值（`temp/pic`），
