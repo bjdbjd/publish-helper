@@ -41,8 +41,8 @@ def convert_chinese_punctuation_to_english(text: str) -> str:
         '；': '; ',  # Semicolon
         '“': '\'',  # Double quotation mark (opening)
         '”': '\'',  # Double quotation mark (closing)
-        '‘': ''',  # Single quotation mark (opening)
-        '’': ''',  # Single quotation mark (closing)
+        '‘': '\'',  # Single quotation mark (opening)
+        '’': '\'',  # Single quotation mark (closing)
         '（': ' (',  # Left parenthesis
         '）': ') ',  # Right parenthesis
         '【': ' [',  # Left square bracket
@@ -162,21 +162,27 @@ def chinese_to_int(chinese_num: str) -> Union[int, None]:
             '万': 10000,
         }
 
-        # 逐字符解析：数字字符累加到 current，遇到单位则按单位进档
-        total = 0
-        current = 0
+        # 逐字符解析：数字字符暂存 current；
+        # 十/百/千 在「节」内累积（section）；万 把整节乘 10000 后并入 total。
+        total = 0       # 已结算的「万」以上部分
+        section = 0     # 当前节（< 10000）
+        current = 0     # 当前数字字符
         for char in chinese_num:
             if char in num_map:
                 current = num_map[char]
+            elif char == '万':
+                section += current
+                total += section * 10000
+                section = 0
+                current = 0
             elif char in unit_map:
                 unit = unit_map[char]
                 # '十' 前无数字时视为 1 个十（'十' → 10）
-                current = current if current != 0 else 1
-                total += current * unit
+                section += (current if current != 0 else 1) * unit
                 current = 0
             else:
                 raise ValueError(f"无法识别的字符: {char}")
-        total += current
+        total += section + current
         return total
     except ValueError:
         return None

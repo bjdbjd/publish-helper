@@ -64,8 +64,8 @@ def get_combo_box_data(data_name: str) -> Tuple[bool, list]:
 
 
 def update_combo_box_data(configuration_data: str, configuration_name: str) -> Tuple[bool, str]:
-    # 将给定的字符串分割成列表
-    sources_list = configuration_data.split('\\n')
+    # 将给定的字符串按**换行**分割成列表
+    sources_list = configuration_data.split('\n')
 
     # 文件路径
     file_path = combine_directories('static/combo-box-data.json')

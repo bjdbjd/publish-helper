@@ -176,7 +176,9 @@ def get_thumbnail(video_path, screenshot_storage_path, thumbnail_rows, thumbnail
         return False, str(e)
 
     finally:
-        video_capture.release()
+        # cv2.VideoCapture(...) 构造本身可能抛异常，此时 video_capture 仍为 None
+        if video_capture is not None:
+            video_capture.release()
 
     print(f'拼接后的图像已保存到{thumbnail_path}')
     return True, thumbnail_path

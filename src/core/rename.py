@@ -464,8 +464,11 @@ def rename_file(file_path: str, new_file_name: str) -> Tuple[bool, str]:
     file_dir, file_base = os.path.split(file_path)
     file_name, file_extension = os.path.splitext(file_base)
 
-    # 构建新文件名，保留原扩展名
-    new_name = file_dir + '/' + new_file_name + file_extension
+    # 构建新文件名，保留原扩展名（若新名已带同名扩展名则不重复追加）
+    if file_extension and new_file_name.lower().endswith(file_extension.lower()):
+        new_name = file_dir + '/' + new_file_name
+    else:
+        new_name = file_dir + '/' + new_file_name + file_extension
 
     # 重命名文件
     try:

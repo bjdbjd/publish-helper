@@ -47,7 +47,12 @@ def _norm_ptgen_url(api_url):
     if not _is_new_pt_gen_api(api_url):
         return api_url.rstrip('/')
     parts = urlsplit(api_url)
-    host = parts.netloc or parts.path
+    if parts.netloc:
+        host = parts.netloc
+    else:
+        # 无 scheme 时把输入当 host+path，只取第一段作为 host，
+        # 否则整段 path 会被当成 host 拼出 .../api/getData/api/getData。
+        host = parts.path.split('/')[0]
     return urlunsplit((parts.scheme or 'https', host, '/api/getData', '', ''))
 
 
@@ -260,7 +265,7 @@ def get_data_from_pt_gen_description(main_title: str, description: str, media_in
         video_format = '720i'
     if '480p' in main_title or '480P' in main_title:
         video_format = '480p'
-    if '480i' in main_title or '480P' in main_title:
+    if '480i' in main_title:
         video_format = '480i'
     print('获取到分辨率' + video_format)
 

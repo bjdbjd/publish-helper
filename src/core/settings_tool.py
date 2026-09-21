@@ -210,15 +210,22 @@ class SettingsManager:
             self._settings_cache = self._read_settings()
         return self._settings_cache.copy()
 
-    def update_all_settings(self, settings: Dict[str, Any]) -> None:
-        """
-        Update all settings.
+    def update_all_settings(self, settings: Dict[str, Any], merge: bool = True) -> None:
+        """Update settings.
 
         Args:
             settings: New settings dictionary
+            merge: 默认 True —— 只覆盖传入的键，其余键保持原值。
+               设 False 时整表替换（旧行为，少传一个键即永久丢键，
+               `POST /api/settings/update` 曾如此）。
         """
-        self._write_settings(settings)
-        logger.info("Updated all settings")
+        if merge:
+            current = self.get_all_settings()
+            current.update(settings)
+            self._write_settings(current)
+        else:
+            self._write_settings(settings)
+        logger.info("Updated all settings (merge=%s)", merge)
 
     def reset_to_defaults(self) -> None:
         """Reset settings to default values."""
