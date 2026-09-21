@@ -86,7 +86,9 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # UPX 仅 Windows 启用：UPX 压缩 macOS Mach-O 二进制会破坏签名/加载，
+    # 官方亦不建议在 macOS 上使用 UPX。
+    upx=sys.platform != "darwin",
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,          # GUI 程序：不弹控制台
@@ -99,3 +101,20 @@ exe = EXE(
     # Linux 忽略 icon，且传 .ico 会告警；macOS 需另行准备 icons.icns。
     icon=str(ROOT / "static" / "ph-bjd.ico") if sys.platform == "win32" else None,
 )
+
+# macOS：必须包成 .app 才能双击运行（带 Dock 图标、可被"打开方式"识别）。
+# Windows/Linux 上跳过，产出可直接双击的可执行文件。
+if sys.platform == "darwin":
+    app = BUNDLE(
+        exe,
+        name="Publish Helper.app",
+        icon=None,          # 如需图标：准备 static/ph-bjd.icns 后填路径
+        bundle_identifier="com.bjdbjd.publishhelper",
+        info_plist={
+            "CFBundleShortVersionString": "2.0.0",
+            "NSHighResolutionCapable": True,
+            # 本应用会读写用户选择的文件，且内置 Flask 监听本地端口：
+            # 未签名版本在沙箱下需要这些声明才能正常工作。
+            "NSDownloadsFolderUsageDescription": "用于读取待发布的视频资源。",
+        },
+    )
