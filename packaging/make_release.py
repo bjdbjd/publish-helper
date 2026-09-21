@@ -38,7 +38,15 @@ def read_version() -> str:
 
 
 def platform_tag() -> str:
+    """平台标签，同时用于产物文件名。
+
+    文件名里用 macos 而非 platform.system() 的 "darwin"：对用户而言
+    "macos-arm64" 比 "darwin-arm64" 更直观，也与 Release 页的
+    windows-x64 / linux-x64 命名保持一致。
+    """
     system = platform.system().lower()
+    if system == "darwin":
+        system = "macos"
     machine = platform.machine().lower()
     arch = {"amd64": "x64", "x86_64": "x64", "arm64": "arm64", "aarch64": "arm64"}.get(
         machine, machine
