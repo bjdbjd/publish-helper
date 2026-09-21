@@ -67,6 +67,59 @@ def _error(status_code, message, http_status=400, data=None, exc=None):
     return jsonify({'data': data or {}, 'message': message, 'statusCode': status_code}), http_status
 
 
+@api.errorhandler(404)
+def _handle_404(error):
+    """未注册路径也返回统一包络（Flask 默认是 HTML，客户端难以统一解析）。"""
+    return _error('NOT_FOUND', '请求的资源不存在。', 404)
+
+
+@api.errorhandler(405)
+def _handle_405(error):
+    """方法不匹配也返回统一包络。"""
+    return _error('METHOD_NOT_ALLOWED', '请求方法不被允许。', 405)
+
+
+def _resolve_media_path(raw_path):
+    """把请求参数 join 到 media 根并解析为绝对路径，返回 (abs_path, media_root)。
+
+    调用方应随后用 `_is_within(abs_path, media_root)` 做边界判断，**不要**再用
+    字符串 `startswith`——后者既是前缀绕过（`media_evil/` 通过）也会因为
+    `abspath` 结果恒非空而使「空路径 → 422」变成死分支。
+    """
+    media_path = os.path.abspath(combine_directories('media'))
+    return os.path.abspath(os.path.join(media_path, raw_path)), media_path
+
+
+def _is_within(target_path, allowed_root):
+    """判断 target 是否在 allowed_root 之内（按路径分隔符边界，不是字符串前缀）。
+
+    用 `os.path.commonpath` 比较，避免 `media_evil` 这类前缀 lookalike 通过。
+    根目录**自身**视为在内——调用方随后会把它判成「缺少路径参数」返回 422
+    （原先的 `if path == ''` 分支因为先做了 abspath 而恒不成立，是死代码）。
+    """
+    try:
+        target = os.path.abspath(target_path)
+        root = os.path.abspath(allowed_root)
+        return os.path.commonpath([target, root]) == root
+    except (ValueError, TypeError):
+        # 跨盘符等无法比较的情况
+        return False
+
+
+def _to_media_relative(image_path, media_path):
+    """把媒体相关路径裁成「相对 media 根」的形式。
+
+    截图/缩略图的存储目录默认是 settings 里的相对值（`temp/pic`），
+    此时返回值本来就不是 media 下的绝对路径，`replace(media_path, '')` 不会命中。
+    这里统一：在 media 内 → 裁掉前缀；否则原样返回（并统一分隔符为 `/`）。
+    """
+    p = str(image_path)
+    prefix = os.path.abspath(media_path) + os.sep
+    if os.path.isabs(p) and os.path.abspath(p).startswith(prefix):
+        p = os.path.abspath(p)[len(prefix):]
+    return p.replace('\\', '/')
+
+
 def start_api():
     api.run(host=config.API_HOST, port=int(get_settings('api_port')), debug=config.API_DEBUG, use_reloader=False,
             threaded=True)
@@ -108,18 +161,17 @@ def api_get_screenshot():
     try:
         # 从请求URL中获取参数
         path = _payload().get('path', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        path = os.path.abspath(os.path.join(media_path, path))
+        path, media_path = _resolve_media_path(path)
 
         # 为了保证安全，确认绝对路径为media目录
-        if not path.startswith(media_path):
+        if not _is_within(path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此路径下的视频文件，请把视频文件储存在media目录下。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
 
-        if path == '':
+        if path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {
                     'screenshotNumber': '0',
@@ -207,7 +259,7 @@ def api_get_screenshot():
                                 return jsonify({
                                     'data': {
                                         'screenshotNumber': str(len(response)),
-                                        'screenshotPath': [imagePath.replace(media_path, '') for imagePath in response],
+                                        'screenshotPath': [_to_media_relative(imagePath, media_path) for imagePath in response],
                                         'videoPath': video_path
                                     },
                                     'message': '获取截图成功。',
@@ -292,18 +344,17 @@ def api_get_thumbnail():
     try:
         # 从请求URL中获取参数
         path = _payload().get('path', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        path = os.path.abspath(os.path.join(media_path, path))
+        path, media_path = _resolve_media_path(path)
 
         # 为了保证安全，确认绝对路径为media目录
-        if not path.startswith(media_path):
+        if not _is_within(path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此路径下的视频文件，请把视频文件储存在media目录下。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
 
-        if path == '':
+        if path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {
                     'thumbnailPath': '',
@@ -506,16 +557,15 @@ def api_get_media_info():
     try:
         # 从请求URL中获取path
         path = _payload().get('path', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        path = os.path.abspath(os.path.join(media_path, path))
+        path, media_path = _resolve_media_path(path)
         # 为了安全，确认绝对路径media目录
-        if not path.startswith(media_path):
+        if not _is_within(path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
-        if path == '':
+        if path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {
                     'mediaInfo': '',
@@ -585,16 +635,15 @@ def api_get_video_info():
     try:
         # 从请求URL中获取path
         path = _payload().get('path', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        path = os.path.abspath(os.path.join(media_path, path))
+        path, media_path = _resolve_media_path(path)
         # 为了安全，确认绝对路径media目录
-        if not path.startswith(media_path):
+        if not _is_within(path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
-        if path == '':
+        if path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {
                     'videoPath': '',
@@ -808,6 +857,10 @@ def api_get_playlet_description():
         category = _payload().get('category', default='', type=str)
         language = _payload().get('language', default='', type=str)
         season_number = _payload().get('seasonNumber', default='', type=str)
+        if season_number == '':
+            # 不传时按第 1 季处理；原先是把 '' 直接交给 get_playlet_description，
+            # 内层 int('') 抛 ValueError 被兜成 500（最常见的调用姿势即崩）。
+            season_number = '1'
         playlet_description = get_playlet_description(original_title, year, area, category, language, season_number)
         return jsonify({
             'data': {
@@ -843,8 +896,8 @@ def api_get_pt_gen_info():
                     'category': '',
                     'actors': ''
                 },
-                'message': 'MISSING_REQUIRED_PARAMETER',
-                'statusCode': '缺少PT-Gen简介内容。'
+                'message': '缺少PT-Gen简介内容。',
+                'statusCode': 'MISSING_REQUIRED_PARAMETER'
             }), 422
 
         original_title, english_title, year, other_names_sorted, category, actors_list, episodes, season = get_pt_gen_info(
@@ -901,18 +954,17 @@ def api_make_torrent():
     try:
         # 从请求URL中获取参数
         path = _payload().get('path', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        path = os.path.abspath(os.path.join(media_path, path))
+        path, media_path = _resolve_media_path(path)
 
         # 为保证安全，确认绝对路径为media目录
-        if not path.startswith(media_path):
+        if not _is_within(path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
 
-        if path == '':
+        if path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {
                     'torrentPath': ''
@@ -1040,16 +1092,15 @@ def api_rename_folder():
     try:
         # 从请求URL中获取参数
         folder_path = _payload().get('folderPath', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        folder_path = os.path.abspath(os.path.join(media_path, folder_path))
+        folder_path, media_path = _resolve_media_path(folder_path)
         # 为保证安全，确认绝对路径为media目录
-        if not folder_path.startswith(media_path):
+        if not _is_within(folder_path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
-        if folder_path == '':
+        if folder_path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {},
                 'message': '缺少文件路径。',
@@ -1103,18 +1154,17 @@ def api_rename_file():
     try:
         # 从请求URL中获取参数
         file_path = _payload().get('filePath', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        file_path = os.path.abspath(os.path.join(media_path, file_path))
+        file_path, media_path = _resolve_media_path(file_path)
 
         # 为保证安全，确认绝对路径为media目录
-        if not file_path.startswith(media_path):
+        if not _is_within(file_path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
 
-        if file_path == '':
+        if file_path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {
                     'newFilePath': ''
@@ -1178,18 +1228,17 @@ def api_create_hard_link():
     try:
         # 从请求URL中获取参数
         path = _payload().get('path', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        path = os.path.abspath(os.path.join(media_path, path))
+        path, media_path = _resolve_media_path(path)
 
         # 为保证安全，确认绝对路径为media目录
-        if not path.startswith(media_path):
+        if not _is_within(path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
 
-        if path == '':
+        if path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {
                     'hardLinkPath': ''
@@ -1208,8 +1257,9 @@ def api_create_hard_link():
             }), 422
 
         make_hard_link_success, response = create_hard_link(path)
-        response = response.replace(media_path + '/', '')
         if make_hard_link_success:
+            # 仅在成功时裁剪路径前缀（原先无条件 replace，失败时会把错误串也处理一遍）
+            response = response.replace(media_path + '/', '')
             return jsonify({
                 'data': {
                     'hardLinkPath': response
@@ -1242,18 +1292,17 @@ def api_move_file_to_folder():
     try:
         # 从请求URL中获取参数
         path = _payload().get('filePath', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        file_path = os.path.abspath(os.path.join(media_path, path))
+        file_path, media_path = _resolve_media_path(path)
 
         # 为保证安全，确认绝对路径为media目录
-        if not path.startswith(media_path):
+        if not _is_within(file_path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
 
-        if file_path == '':
+        if file_path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {
                     'newFilePath': ''
@@ -1317,18 +1366,17 @@ def api_rename_episode():
     try:
         # 从请求URL中获取参数
         folder_path = _payload().get('folderPath', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        folder_path = os.path.abspath(os.path.join(media_path, folder_path))
+        folder_path, media_path = _resolve_media_path(folder_path)
 
         # 为保证安全，确认绝对路径为media目录
-        if not folder_path.startswith(media_path):
+        if not _is_within(folder_path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
 
-        if folder_path == '':
+        if folder_path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {
                     'newFolderPath': ''
@@ -1359,7 +1407,7 @@ def api_rename_episode():
 
         episode_start_number = _payload().get('episodeStartNumber', default='', type=str)  # 必须信息
 
-        if episode_start_number == '' or episode_start_number == '':
+        if episode_start_number == '':
             episode_start_number = '1'
 
         is_video_path, response = check_path_and_find_video(folder_path)  # 获取视频的路径
@@ -1451,18 +1499,17 @@ def api_get_total_episode():
     try:
         # 从请求URL中获取参数
         folder_path = _payload().get('folderPath', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        folder_path = os.path.abspath(os.path.join(media_path, folder_path))
+        folder_path, media_path = _resolve_media_path(folder_path)
 
         # 为保证安全，确认绝对路径为media目录
-        if not folder_path.startswith(media_path):
+        if not _is_within(folder_path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
 
-        if folder_path == '':
+        if folder_path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {
                     'totalEpisode': ''
@@ -1482,7 +1529,7 @@ def api_get_total_episode():
 
         episode_start_number = _payload().get('episodeStartNumber', default='', type=str)
 
-        if episode_start_number == '' or episode_start_number == '':
+        if episode_start_number == '':
             episode_start_number = '1'
 
         is_video_path, response = check_path_and_find_video(folder_path)  # 获取视频的路径
@@ -1751,7 +1798,7 @@ def api_get_file():
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
 
         # 检查文件是否存在（且是普通文件，防止返回目录内容）
@@ -1869,7 +1916,7 @@ def api_get_pt_gen_info_by_url():
                     'otherTitles': other_titles,
                     'category': category,
                     'actors': actors,
-                    'description': response
+                    'description': format_data
                 },
                 'message': '获取PT-Gen简介关键参数成功。',
                 'statusCode': 'OK'
@@ -1899,14 +1946,13 @@ def api_medis_path():
     try:
         # 从请求URL中获取参数
         path = _payload().get('path', default='', type=str)  # 必须信息
-        media_path = combine_directories('media')
-        target_path = os.path.abspath(os.path.join(media_path, path))
+        target_path, media_path = _resolve_media_path(path)
         # 确认绝对路径为temp目录即可
-        if not target_path.startswith(media_path):
+        if not _is_within(target_path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此文件。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
         # 获取当前目录下文件列表
         contents = list_files_and_dirs(target_path)
@@ -1923,9 +1969,9 @@ def api_medis_path():
         logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {
-                'description': ''
+                'fileList': []
             },
-            'message': f'获取路径失败，详情请查看服务端日志。',
+            'message': '获取路径失败，详情请查看服务端日志。',
             'statusCode': 'GENERAL_ERROR'
         }), 500
 
@@ -2000,13 +2046,12 @@ def api_auto_handle_movie():
             episodes_start_number = validate_and_convert_to_int(episodes_start_number, 'episodes_start_number')
 
         # 为了保证安全，只能访问media目录下的资源
-        media_path = combine_directories('media')
-        path = os.path.abspath(os.path.join(media_path, path))
-        if not path.startswith(media_path):
+        path, media_path = _resolve_media_path(path)
+        if not _is_within(path, media_path):
             return jsonify({
                 'data': {},
                 'message': '无权访问此路径下的视频文件，请把视频文件储存在media目录下。',
-                'statusCode': 'UNAUTHORIZED_ACCESS_ERROR'
+                'statusCode': 'UNAUTHORIZED'
             }), 401
 
         if resource_url == '':
@@ -2016,7 +2061,7 @@ def api_auto_handle_movie():
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
             }), 422
 
-        if path == '':
+        if path == media_path:  # 原始参数为空 → 解析后即 media 根
             return jsonify({
                 'data': {},
                 'message': '缺少资源文件路径。',
@@ -2126,7 +2171,10 @@ def api_auto_handle_movie():
 
         # 从后台读取参数
         pt_gen_api_url = get_settings('pt_gen_api_url')
-        screenshot_storage_path = 'temp/pic'  # 默认储存位置，防止无法访问
+        # 与 /api/getScreenshot 等其他路由保持一致：读 settings。
+        # 原先硬编码相对 'temp/pic'，落点取决于**进程 CWD**，与 /api/getFile 的
+        # 白名单基准（config.TEMP_DIR，项目根）不同源，从别处启动时刚写的图取不回。
+        screenshot_storage_path = get_settings('screenshot_storage_path') or str(config.TEMP_DIR / 'pic')
         screenshot_number = int(get_settings('screenshot_number'))
         screenshot_threshold = float(get_settings('screenshot_threshold'))
         screenshot_start_percentage = float(get_settings('screenshot_start_percentage'))
