@@ -35,6 +35,9 @@ get_name_tv_success = False
 get_name_tv_failure_number = 0
 
 
+_AUMID = 'bjdbjd.publish-helper'
+
+
 def _app_icon() -> QIcon:
     """应用图标。用 config.STATIC_DIR 而非相对路径：打包/换目录启动时 cwd 不保证是项目根，
     相对路径会让 QIcon 静默拿到空图标（不报错，只是窗口没图标）。"""
@@ -42,11 +45,37 @@ def _app_icon() -> QIcon:
     return QIcon(str(config.STATIC_DIR / 'ph-bjd.ico'))
 
 
+def _register_windows_app_id() -> None:
+    """注册 Windows AppUserModelID。
+
+    仅针对打包后的 windowed（--noconsole）PyInstaller 程序：不注册显式 AUMID 时，
+    Windows 10/11 的任务栏按钮图标由进程/引导加载器决定，经常退化成**空白或通用图标**，
+    即使 `setWindowIcon` 已让标题栏图标正常。显式注册后，任务栏按钮与系统托盘能
+    拿到与 exe 嵌入图标一致的图标，并正确分组。必须在 QApplication 创建**之前**调用，
+    且每个运行实例至多调用一次。
+
+    仅 Windows 生效；非 Windows / 开发态（源码运行）跳过，无副作用。
+    """
+    if sys.platform != 'win32':
+        return
+    try:
+        import ctypes
+        # 传 2 表示当前进程是 GUI 进程，替换其 AUMID（而非追加）。
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(_AUMID)
+    except Exception:
+        # 失败不阻塞启动：AUMID 只是图标/分组提示，缺失时退化为默认行为。
+        pass
+
+
 def start_gui():
+    # PyInstaller windowed 程序必须先注册 AUMID，否则任务栏图标空白（见 _register_windows_app_id）。
+    _register_windows_app_id()
     gui = QApplication(sys.argv)
+    # 应用级图标：Qt 会把 setWindowIcon 从 QApplication 传播到所有窗口，
+    # 任务栏按钮取的是应用图标，仅设单个 window 的图标在打包态可能不被任务栏采纳。
+    gui.setWindowIcon(_app_icon())
     my_mainwindow = mainwindow()
-    my_ico = _app_icon()
-    my_mainwindow.setWindowIcon(my_ico)
+    my_mainwindow.setWindowIcon(_app_icon())
     my_mainwindow.show()
     sys.exit(gui.exec())
 
