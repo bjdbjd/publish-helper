@@ -1,9 +1,10 @@
+import json
 import os
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, List, Tuple
 
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, stream_with_context, Response
 from flask_cors import CORS
 from werkzeug.datastructures import ImmutableMultiDict
 
@@ -17,7 +18,8 @@ from src.core.screenshot import get_screenshot, get_thumbnail
 from src.core.data import get_combo_box_data, update_combo_box_data
 from src.core.ptgen import get_data_from_pt_gen_description, get_playlet_description
 from src.core.settings_tool import get_settings, get_settings_json, update_settings, update_settings_json
-from src.core.text import validate_and_convert_to_int
+from src.core.text import validate_and_convert_to_int, chinese_name_to_pinyin, fill_english_title
+from src.core.autofeed import get_auto_feed_link
 from src.core.torrent import make_torrent
 from src.core.video import check_path_and_find_video, delete_season_number, get_video_files
 from src.utils.file_utils import combine_directories
@@ -691,6 +693,8 @@ def api_get_video_info():
                 audio_codec = response[5]
                 channels = response[6]
                 audio_num = response[7]
+                # 原始规格（未经命名缩写筛除），供前端如实展示；旧调用方只用 0-8，追加不影响
+                raw_info = response[9] if len(response) > 9 else {}
                 return jsonify({
                     'data': {
                         'videoPath': video_path,
@@ -701,7 +705,8 @@ def api_get_video_info():
                         'frameRate': frame_rate,
                         'audioCodec': audio_codec,
                         'channels': channels,
-                        'audioNum': audio_num
+                        'audioNum': audio_num,
+                        'raw': raw_info
                     },
                     'message': '获取视频关键参数成功。',
                     'statusCode': 'OK'
@@ -1061,6 +1066,8 @@ def api_get_name_from_template():
         playlet_source = _payload().get('playletSource', default='', type=str)
         category = _payload().get('category', default='', type=str)
         actors = _payload().get('actors', default='', type=str)
+        # 英文名为空且原名是中文时，用拼音兜底（对齐 PyQt 版行为）
+        english_title = fill_english_title(original_title, english_title)
         english_title = delete_season_number(english_title, season_number)
 
         name = get_name_from_template(english_title, original_title, season, '{集数}', year, video_format,
@@ -2026,9 +2033,124 @@ def convert_size(size_bytes):
     return '{:.2f} {}'.format(size_bytes, size_name[i])
 
 
+@api.route('/api/chineseNameToPinyin', methods=['GET', 'POST'])
+# 中文原名 → 汉语拼音（供前端在未获取到英文名时给出建议）
+def api_chinese_name_to_pinyin():
+    try:
+        original_title = _payload().get('originalTitle', default='', type=str)
+        if not original_title:
+            return jsonify({
+                'data': {'pinyin': ''},
+                'message': '缺少原名（originalTitle）。',
+                'statusCode': 'MISSING_REQUIRED_PARAMETER'
+            }), 422
+
+        pinyin = chinese_name_to_pinyin(original_title).strip()
+        return jsonify({
+            'data': {'pinyin': pinyin},
+            'message': '转换成功。',
+            'statusCode': 'OK'
+        }), 200
+    except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
+        return jsonify({
+            'data': {'pinyin': ''},
+            'message': f'转换为拼音失败：{e}',
+            'statusCode': 'GENERAL_ERROR'
+        }), 500
+
+
+@api.route('/api/getAutoFeedLink', methods=['POST'])
+# 根据一键发布的结果字段生成 auto_feed 链接（复用核心 get_auto_feed_link）
+def api_get_auto_feed_link():
+    try:
+        main_title = _payload().get('mainTitle', default='', type=str)
+        second_title = _payload().get('secondTitle', default='', type=str)
+        description = _payload().get('description', default='', type=str)
+        media_info = _payload().get('mediaInfo', default='', type=str)
+        file_name = _payload().get('fileName', default='', type=str)
+        team = _payload().get('team', default='', type=str)
+        source = _payload().get('source', default='', type=str)
+        category = _payload().get('category', default='', type=str)
+        torrent_url = _payload().get('torrentUrl', default='', type=str)
+
+        if not main_title and not file_name:
+            return jsonify({
+                'data': {'autoFeedLink': ''},
+                'message': '缺少必要参数（mainTitle / fileName）。',
+                'statusCode': 'MISSING_REQUIRED_PARAMETER'
+            }), 422
+
+        success, auto_feed_link = get_auto_feed_link(main_title, second_title, description, media_info, file_name,
+                                                     team, source, category, torrent_url)
+        if not success:
+            return jsonify({
+                'data': {'autoFeedLink': ''},
+                'message': f'获取 auto_feed 链接失败：{auto_feed_link}',
+                'statusCode': 'BACKEND_PROCESSING_ERROR'
+            }), 400
+        return jsonify({
+            'data': {'autoFeedLink': auto_feed_link},
+            'message': '获取 auto_feed 链接成功。',
+            'statusCode': 'OK'
+        }), 200
+    except Exception as e:
+        logger.error('接口异常：%s', e, exc_info=True)
+        return jsonify({
+            'data': {'autoFeedLink': ''},
+            'message': f'获取 auto_feed 链接失败：{e}',
+            'statusCode': 'GENERAL_ERROR'
+        }), 500
+
+
+# 一键自动发布流式进度：阶段注册表（顺序即执行顺序）与单行 NDJSON 构造。
+# /api/autoHandleVideo 现在流式返回 NDJSON——每到一个阶段边界 yield 一条进度行，
+# 最后一行 yield 结果/错误包络。前端以各行的 'type' / 'statusCode' 区分。
+_AUTO_HANDLE_STAGES = [
+    {'stage': 'PT_GEN_FETCH',      'label': '获取PT-Gen简介'},
+    {'stage': 'SCREENSHOT',        'label': '截图并上传图床'},
+    {'stage': 'THUMBNAIL',         'label': '生成缩略图并上传'},
+    {'stage': 'VIDEO_INFO',        'label': '获取视频信息'},
+    {'stage': 'PARSE_DESCRIPTION', 'label': '解析简介字段'},
+    {'stage': 'TOTAL_EPISODE',     'label': '获取总集数'},
+    {'stage': 'NAME_GEN',          'label': '生成命名'},
+    {'stage': 'RENAME_MOVE',       'label': '重命名/移动文件'},
+    {'stage': 'MEDIA_INFO',        'label': '获取MediaInfo'},
+    {'stage': 'ANALYZE_PARAMS',    'label': '分析关键参数'},
+    {'stage': 'MAKE_TORRENT',      'label': '制作种子'},
+]
+
+
+def _progress(stage, message, sub=None, sub_total=None):
+    """构造一条进度 NDJSON 事件。percent 由阶段在注册表中的位置推算。"""
+    idx = next((i for i, s in enumerate(_AUTO_HANDLE_STAGES) if s['stage'] == stage), -1)
+    if idx < 0:
+        return None
+    total = len(_AUTO_HANDLE_STAGES)
+    percent = round((idx + 1) / total * 100)
+    ev = {
+        'type': 'progress',
+        'stage': stage,
+        'label': _AUTO_HANDLE_STAGES[idx]['label'],
+        'percent': percent,
+        'message': message,
+    }
+    if sub is not None:
+        ev['sub'] = sub
+    if sub_total is not None:
+        ev['subTotal'] = sub_total
+    # NDJSON：每条事件独占一行（stream_with_context 按字符串原样写出，需显式换行分隔）
+    return json.dumps(ev, ensure_ascii=False) + '\n'
+
+
 @api.route('/api/autoHandleVideo', methods=['POST'])
-# 用于获取MediaInfo，传入一个文件地址或者一个文件夹地址，返回视频文件路径和MediaInfo
-def api_auto_handle_movie():
+# 一键自动发布（流式）：把同步流水线包成 NDJSON 流逐行输出进度。
+def api_auto_handle_video_stream():
+    return Response(stream_with_context(_auto_handle_video_pipeline()), mimetype='application/x-ndjson')
+
+
+# 流水线主体（生成器）。被上方流式路由迭代；参数校验/失败也会作为一条错误包络 yield 出来。
+def _auto_handle_video_pipeline():
     try:
         resource_url = _payload().get('resourceUrl', default='', type=str)  # 必须信息
         path = _payload().get('path', default='', type=str)  # 必须信息
@@ -2048,46 +2170,52 @@ def api_auto_handle_movie():
         # 为了保证安全，只能访问media目录下的资源
         path, media_path = _resolve_media_path(path)
         if not _is_within(path, media_path):
-            return jsonify({
+            yield json.dumps({
                 'data': {},
                 'message': '无权访问此路径下的视频文件，请把视频文件储存在media目录下。',
                 'statusCode': 'UNAUTHORIZED'
-            }), 401
+            }, ensure_ascii=False) + '\n'
+            return
 
         if resource_url == '':
-            return jsonify({
+            yield json.dumps({
                 'data': {},
                 'message': '缺少资源链接。',
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
-            }), 422
+            }, ensure_ascii=False) + '\n'
+            return
 
         if path == media_path:  # 原始参数为空 → 解析后即 media 根
-            return jsonify({
+            yield json.dumps({
                 'data': {},
                 'message': '缺少资源文件路径。',
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
-            }), 422
+            }, ensure_ascii=False) + '\n'
+            return
 
         if source == '':
-            return jsonify({
+            yield json.dumps({
                 'data': {},
                 'message': '缺少资源来源信息。',
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
-            }), 422
+            }, ensure_ascii=False) + '\n'
+            return
 
         if team == '':
-            return jsonify({
+            yield json.dumps({
                 'data': {},
                 'message': '缺少制作组信息。',
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
-            }), 422
+            }, ensure_ascii=False) + '\n'
+            return
 
         if category == '':
-            return jsonify({
+            yield json.dumps({
                 'data': {},
                 'message': '缺少资源类型信息。',
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
-            }), 422
+            }, ensure_ascii=False) + '\n'
+            return
 
         @dataclass
         class Data:
@@ -2132,6 +2260,8 @@ def api_auto_handle_movie():
             team: str
             '''种子文件'''
             torrent_file_url: str
+            '''重命名后的新路径（相对 media/），供前端回写 flow.path'''
+            new_path: str
             '''视频编码'''
             video_codec: str
             '''分辨率'''
@@ -2158,6 +2288,7 @@ def api_auto_handle_movie():
             tags=[],
             team='',
             torrent_file_url='/api/getFile?filePath=',
+            new_path='',
             video_codec='',
             video_format='', )
         data_instance.source = source
@@ -2188,6 +2319,7 @@ def api_auto_handle_movie():
         delete_screenshot = bool(get_settings('delete_screenshot'))
 
         # 获取pt_gen简介
+        yield _progress('PT_GEN_FETCH', '正在获取PT-Gen简介')
         get_pt_gen_description_success, response = get_pt_gen_description(pt_gen_api_url, resource_url)
         if not get_pt_gen_description_success:
             # 一次不成功，再试一次
@@ -2208,6 +2340,7 @@ def api_auto_handle_movie():
                         is_video_path, response = check_path_and_find_video(path)  # 视频资源的路径
                         if is_video_path == 1 or is_video_path == 2:
                             video_path = response
+                            yield _progress('SCREENSHOT', '正在截图并上传图床')
                             screenshot_success, response = get_screenshot(video_path, screenshot_storage_path,
                                                                           screenshot_number,
                                                                           screenshot_threshold,
@@ -2236,9 +2369,12 @@ def api_auto_handle_movie():
                                     # 是否删除截图
                                     if delete_screenshot:
                                         if os.path.exists(picture_path):
-                                            # 删除文件
-                                            os.remove(picture_path)
-                                            _log(f'文件 {picture_path} 已被删除。')
+                                            # 删除临时截图仅作清理，失败（如 Windows 文件占用）不应中断发布
+                                            try:
+                                                os.remove(picture_path)
+                                                _log(f'文件 {picture_path} 已被删除。')
+                                            except OSError as e:
+                                                _log(f'删除截图 {picture_path} 失败（忽略）：{e}')
                                         else:
                                             _log(f'文件 {picture_path} 不存在。')
                             else:
@@ -2264,6 +2400,7 @@ def api_auto_handle_movie():
                         is_video_path, response = check_path_and_find_video(path)  # 视频资源的路径
                         if is_video_path == 1 or is_video_path == 2:
                             video_path = response
+                            yield _progress('THUMBNAIL', '正在生成缩略图并上传')
                             get_thumbnail_success, response = get_thumbnail(video_path, screenshot_storage_path,
                                                                             thumbnail_rows,
                                                                             thumbnail_cols, screenshot_start_percentage,
@@ -2286,9 +2423,12 @@ def api_auto_handle_movie():
                                 # 是否删除截图
                                 if delete_screenshot:
                                     if os.path.exists(thumbnail_path):
-                                        # 删除文件
-                                        os.remove(thumbnail_path)
-                                        _log(f'文件 {thumbnail_path} 已被删除。')
+                                        # 删除临时缩略图仅作清理，失败（如 Windows 文件占用）不应中断发布
+                                        try:
+                                            os.remove(thumbnail_path)
+                                            _log(f'文件 {thumbnail_path} 已被删除。')
+                                        except OSError as e:
+                                            _log(f'删除缩略图 {thumbnail_path} 失败（忽略）：{e}')
                                     else:
                                         _log(f'文件 {thumbnail_path} 不存在。')
                             else:
@@ -2308,6 +2448,7 @@ def api_auto_handle_movie():
         is_video_path, response = check_path_and_find_video(path)  # 视频资源的路径
         if is_video_path == 1 or is_video_path == 2:
             video_path = response
+            yield _progress('VIDEO_INFO', '正在获取视频信息')
             get_video_info_success, response = get_video_info(video_path)
             if get_video_info_success:
                 _log('获取到VideoInfo：' + str(response))
@@ -2327,9 +2468,12 @@ def api_auto_handle_movie():
 
         # 获取PT-GenInfo
         _log(f'获取PT-GenInfo，从{data_instance.description}')
+        yield _progress('PARSE_DESCRIPTION', '正在解析简介字段')
         original_title, english_title, year, other_names_sorted, categories, actors_list, episodes, season = get_pt_gen_info(
             data_instance.description)
         _log(original_title, english_title, year, other_names_sorted, categories, actors_list)
+        # 英文名为空且原名是中文时，用拼音兜底（对齐 PyQt 版行为）
+        english_title = fill_english_title(original_title, english_title or '')
         actors = ''
         other_titles = ''
         is_first = True
@@ -2354,6 +2498,7 @@ def api_auto_handle_movie():
             season = '0' + season_number
 
         # 获取total_episode
+        yield _progress('TOTAL_EPISODE', '正在获取总集数')
         total_episodes = ''
         episodes_num = 0
         if category == 'TV':
@@ -2381,6 +2526,7 @@ def api_auto_handle_movie():
                 raise ValueError(f'资源的路径不正确，必须是文件夹：{response}')
 
         # 获取主标题
+        yield _progress('NAME_GEN', '正在生成命名')
         template = 'main_title_' + category.lower()
         data_instance.main_title = get_name_from_template(english_title, original_title, season, '{集数}', year,
                                                           data_instance.video_format,
@@ -2418,6 +2564,8 @@ def api_auto_handle_movie():
                                                          season_number,
                                                          total_episodes, '', categories, actors, template)
         _log(f'获取到文件名是{data_instance.file_name}')
+
+        yield _progress('RENAME_MOVE', '正在重命名/移动文件')
 
         if category == 'Movie':
             # 给文件或者文件夹重命名
@@ -2494,10 +2642,14 @@ def api_auto_handle_movie():
             else:
                 raise ValueError(f'剧集资源的路径不正确，必须是文件夹：{response}')
 
+        # 重命名后 path 已被更新（Movie/TV 各自分支），下发新路径供前端回写 flow.path
+        data_instance.new_path = _to_media_relative(path, media_path)
+
         # 获取MediaInfo
         is_video_path, response = check_path_and_find_video(path)  # 资源的路径
         if is_video_path == 1 or is_video_path == 2:
             video_path = response
+            yield _progress('MEDIA_INFO', '正在获取MediaInfo')
             get_media_info_success, response = get_media_info(video_path)
             if get_media_info_success:
                 data_instance.media_info = response
@@ -2507,6 +2659,7 @@ def api_auto_handle_movie():
         else:
             raise ValueError(f'资源的路径不正确：{response}')
 
+        yield _progress('ANALYZE_PARAMS', '正在分析关键参数')
         _log('开始分析其他关键参数')
         (data_instance.imdb_url, data_instance.douban_url, data_instance.category, data_instance.area,
          data_instance.video_format,
@@ -2521,6 +2674,7 @@ def api_auto_handle_movie():
         # 开始制作种子
         torrent_storage_path = get_settings('torrent_storage_path')
 
+        yield _progress('MAKE_TORRENT', '正在制作种子')
         make_torrent_success, response = make_torrent(path, torrent_storage_path)
         if make_torrent_success:
             torrent_path = response
@@ -2531,35 +2685,39 @@ def api_auto_handle_movie():
         else:
             raise RuntimeError(f'制作种子失败：{response}')
 
-        return jsonify({
+        yield json.dumps({
             'data': convert_to_camel_case(data_instance),
             'message': '获取成功。',
             'statusCode': 'OK'
-        }), 200
+        }, ensure_ascii=False) + '\n'
+        return
 
     except ValueError as e:
 
         logger.error('接口异常：%s', e, exc_info=True)
-        return jsonify({
+        yield json.dumps({
             'data': {},
             'message': f'您提供的参数有误：{e}',
             'statusCode': 'RUNTIME_ERROR'
-        }), 422
+        }, ensure_ascii=False) + '\n'
+        return
 
     except RuntimeError as e:
 
         logger.error('接口异常：%s', e, exc_info=True)
-        return jsonify({
+        yield json.dumps({
             'data': {},
             'message': f'自动处理视频资源失败：{e}',
             'statusCode': 'RUNTIME_ERROR'
-        }), 500
+        }, ensure_ascii=False) + '\n'
+        return
 
     except Exception as e:
 
         logger.error('接口异常：%s', e, exc_info=True)
-        return jsonify({
+        yield json.dumps({
             'data': {},
             'message': f'自动处理视频文件时发生了意外错误：{e}',
             'statusCode': 'GENERAL_ERROR'
-        }), 500
+        }, ensure_ascii=False) + '\n'
+        return

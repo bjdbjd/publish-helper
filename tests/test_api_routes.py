@@ -459,16 +459,31 @@ class TestMediaFileList:
 
 
 class TestAutoHandleVideo:
+    """autoHandleVideo 自改为流式 NDJSON 后，HTTP 恒为 200，结果/错误在各行的 statusCode 中。
+
+    返回体为 NDJSON 流：行内含 'type':'progress' 进度事件，末行是 'statusCode' 包络。
+    测试断言抓取包络行的 statusCode；同时必须消费完整响应体，避免 generator 未消费完
+    残留 Flask request context 污染后续测试（曾出现 Popped wrong request context）。
+    """
+
+    def _envelope(self, response):
+        # 消费完整 NDJSON 流，返回末行（含 statusCode 的包络）
+        lines = [ln for ln in response.get_data(as_text=True).splitlines() if ln.strip()]
+        envelope = json.loads(lines[-1])
+        return envelope
+
     def test_get_method_405(self, api_client):
         assert api_client.get("/api/autoHandleVideo").status_code == 405
 
     def test_missing_params(self, api_client):
         r = api_client.post("/api/autoHandleVideo", json={})
-        assert r.status_code == 422
+        assert r.status_code == 200  # 流式恒 200
+        assert self._envelope(r)["statusCode"] == "MISSING_REQUIRED_PARAMETER"
 
     def test_unauthorized_path(self, api_client):
         r = api_client.post(
             "/api/autoHandleVideo",
             json={"resourceUrl": "tt1", "path": "../../x", "source": "WEB-DL", "team": "AGSV", "category": "Movie"},
         )
-        assert r.status_code == 401
+        assert r.status_code == 200  # 流式恒 200
+        assert self._envelope(r)["statusCode"] == "UNAUTHORIZED"

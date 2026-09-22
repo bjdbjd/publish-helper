@@ -8,6 +8,8 @@
 返回 422 FILE_PATH_ERROR，据此证明 body / query 两种传参都被正确读到。
 """
 
+import json
+
 import pytest
 
 from src.api.startapi import api
@@ -60,12 +62,18 @@ def test_opt_in_auth(monkeypatch):
 
 
 def test_auto_handle_video_is_post():
-    """autoHandleVideo 是副作用（截图/改名）操作，应为 POST；GET 应 405。"""
+    """autoHandleVideo 是副作用（截图/改名）操作，应为 POST；GET 应 405。
+
+    自改为流式 NDJSON 后 HTTP 恒为 200，缺参错误体现在包络行的 statusCode 中；
+    消费完整流避免残留 Flask request context 污染后续测试。
+    """
     client = api.test_client()
     assert client.get("/api/autoHandleVideo").status_code == 405
     resp = client.post("/api/autoHandleVideo",
                        json={"resourceUrl": "", "path": "", "source": "", "team": "", "category": ""})
-    assert resp.status_code == 422  # 缺必填参数 => 证明 POST + JSON body 被读取
+    assert resp.status_code == 200  # 流式恒 200
+    envelope = json.loads([ln for ln in resp.get_data(as_text=True).splitlines() if ln.strip()][-1])
+    assert envelope["statusCode"] == "MISSING_REQUIRED_PARAMETER"  # 证明 POST + JSON body 被读取
 
 
 def test_long_text_get_accepts_post_body():

@@ -4,6 +4,35 @@ from typing import Any, List, Union
 
 from xpinyin import Pinyin
 
+# 合法英文标题字符集（与 src/core/rename.py 中原先内联的那份保持一致）。
+# 用 unicode 区间表示 Ⅰ-ↈ（罗马数字）而非字面量，避免源码编码歧义。
+ENGLISH_TITLE_PATTERN = (
+    r'^[A-Za-z\-\—\:\s\(\)\'\'\@\#\$\%\^\&\*\!\?\,\.\;\[\]\{\}\|\<\>\`\~\dⅠ-ↈ]+$'
+)
+
+
+def fill_english_title(original_title: str, english_title: str) -> str:
+    """英文名为空且原名可转写时，用汉语拼音兜底。
+
+    对齐 PyQt 版行为：PT-Gen 拿不到英文名、但原名是中文时，用拼音作为英文名。
+    转换结果若仍不符合英文规范（如原名含无法转写的字符），则原样返回（即保持空），
+    由调用方决定是否提示用户手输。
+
+    Args:
+        original_title: 中文原名。
+        english_title: PT-Gen 给出的英文名（可能为空）。
+
+    Returns:
+        可用的英文名；无法生成时返回传入的 english_title。
+    """
+    if english_title:
+        return english_title
+    if not original_title:
+        return english_title
+    pinyin = chinese_name_to_pinyin(original_title).strip()
+    return pinyin if re.match(ENGLISH_TITLE_PATTERN, pinyin) else english_title
+
+
 def chinese_name_to_pinyin(chinese_name: str) -> str:
     p = Pinyin()
     result = ''

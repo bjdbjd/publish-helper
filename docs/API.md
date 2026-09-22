@@ -1,6 +1,6 @@
 # Publish Helper API 接口文档
 
-> 本文档是 **Flask REST API**（`src/api/startapi.py`，26 个路由）的接口级参考，
+> 本文档是 **Flask REST API**（`src/api/startapi.py`，28 个路由）的接口级参考，
 > 面向**调用方**（客户端 / 脚本 / 集成）。每个路由给出：方法、参数、请求示例、响应结构、状态码。
 >
 > - 想看「实现细节、已知 bug、测试覆盖」→ [`BUSINESS_LOGIC.md §5`](BUSINESS_LOGIC.md#5-api-接口清单srcapistartapipy2517-行)
@@ -135,6 +135,14 @@ CORS：默认 `*`。可设 `API_CORS_ORIGINS`（逗号分隔白名单）收窄�
 
 **成功 `200`：**
 `data` 含：`videoPath, videoFormat, videoCodec, bitDepth, hdrFormat, frameRate, audioCodec, channels, audioNum`（`videoFormat` 如 `1080p`，`bitDepth` 如 `10bit`）。
+
+> ⚠️ **这些字段是「命名口径」**：`bitDepth`/`hdrFormat`/`frameRate`/`audioNum`/`channels` 会经缩写表
+> （`src/core/data.py`）筛除默认值 —— `8 bits`、`30.000 FPS`、单音轨等会被**刻意映射为空串**，
+> 因为 PT 发布命名惯例不写默认值。空的字段**不代表获取失败**。
+>
+> 若需**如实展示**真实规格，用 `data.raw`（原始值，未经缩写筛除）：
+> `{ videoFormatRaw, videoCodecRaw, bitDepthRaw, hdrFormatRaw, frameRateRaw, audioCodecRaw, channelsRaw, audioNumRaw }`，
+> 例如 `bitDepthRaw: "8 bits"`、`frameRateRaw: "30.000 FPS"`、`audioNumRaw: "1"`。
 
 **失败**：同 `getMediaInfo`（越权/缺参/路径不存在/解析失败/异常对应 `401/422/422/400/500`）。
 
@@ -397,6 +405,24 @@ CORS：默认 `*`。可设 `API_CORS_ORIGINS`（逗号分隔白名单）收窄�
 **成功 `200`**：`data: { name: "..." }`（`englishTitle` 会先经 `delete_season_number` 去掉季后缀）
 **失败**：缺 `template`→`422`；模板不在白名单→`422 PARAMETER_RANGE_ERROR`；其余异常→`500`。
 
+> **英文名自动兜底**：`englishTitle` 为空且 `originalTitle` 是中文时，后端会自动用汉语拼音
+> （`fill_english_title` → `chinese_name_to_pinyin`）作为英文名，无需调用方处理；显式传入
+> `englishTitle` 时不会被覆盖。同一兜底也应用于 `/api/autoHandleVideo`。
+> 前端若要给用户**预览/编辑**拼音建议，可先调 `GET|POST /api/chineseNameToPinyin`。
+
+---
+
+### 6.2 `GET|POST /api/chineseNameToPinyin`
+
+中文原名 → 汉语拼音（供未获取到英文名时给出建议）。
+
+| 参数 | 必需 | 类型 | 说明 |
+|---|---|---|---|
+| `originalTitle` | ✓ | string | 中文原名 |
+
+**成功 `200`**：`data: { pinyin: "Nian Hui Bu Neng Ting! 2" }`
+**失败**：缺 `originalTitle`→`422 MISSING_REQUIRED_PARAMETER`；异常→`500`。
+
 ---
 
 ## 7. 种子制作
@@ -554,6 +580,8 @@ curl -X POST "http://localhost:15372/api/settings/update" \
 | GET | `/api/getComboBoxData` | 读下拉数据 | ✗ |
 | POST | `/api/updateComboBoxData` | 写下拉数据 | ✗ |
 | GET | `/api/getFile` | 下载文件（temp/） | ✗（temp/） |
+| GET/POST | `/api/chineseNameToPinyin` | 中文原名→拼音 | ✗ |
+| POST | `/api/getAutoFeedLink` | 生成 auto_feed 链接 | ✗ |
 | POST | `/api/autoHandleVideo` | 一键自动发布 | ✓ |
 
-共 **26** 个路由。
+共 **28** 个路由。

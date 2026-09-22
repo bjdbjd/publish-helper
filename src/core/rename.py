@@ -343,9 +343,22 @@ def get_video_info(file_path: str) -> Tuple[bool, list]:
             audio_num = ''
         else:
             audio_num = str(audio_count) + get_abbreviation('Audio')
+        # 原始（未做命名缩写）的参数，供前端「视频参数」如实展示：
+        # 缩写表会把默认值（8bit / 30FPS / 单音轨）刻意映射为空串（命名惯例不写），
+        # 因此这里额外带上真实值，避免界面看起来像「获取失败」。
+        raw_info = {
+            'videoFormatRaw': f'{extract_numbers(width)}x{extract_numbers(height)}' if width and height else '',
+            'videoCodecRaw': video_codec,
+            'bitDepthRaw': bit_depth,
+            'hdrFormatRaw': hdr_format,
+            'frameRateRaw': frame_rate,
+            'audioCodecRaw': audio_codec,
+            'channelsRaw': channels,
+            'audioNumRaw': str(audio_count),
+        }
         return True, [video_format, get_abbreviation(video_codec), get_abbreviation(bit_depth),
                       get_abbreviation(hdr_format), get_abbreviation(frame_rate), get_abbreviation(audio_codec),
-                      get_abbreviation(channels), audio_num, tags]
+                      get_abbreviation(channels), audio_num, tags, raw_info]
     except OSError as e:
         # 文件路径相关的错误
         print(f'文件路径错误：{e}。')

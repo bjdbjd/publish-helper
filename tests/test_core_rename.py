@@ -71,8 +71,9 @@ class TestGetVideoInfo:
         finally:
             os.remove(p)
         assert ok is True
-        assert len(info) == 9
-        video_format, video_codec, bit_depth, hdr, frame_rate, audio_codec, channels, audio_num, tags = info
+        # 第 10 个元素是 raw（原始规格，未经命名缩写筛除），供前端如实展示
+        assert len(info) == 10
+        video_format, video_codec, bit_depth, hdr, frame_rate, audio_codec, channels, audio_num, tags, raw = info
         assert video_format == "1080p"
         assert video_codec == "x264"
         assert bit_depth == "10bit"
@@ -81,6 +82,7 @@ class TestGetVideoInfo:
         assert channels == "5.1"
         assert audio_num == ""  # 单音轨
         assert "国语" in tags
+        assert raw["bitDepthRaw"] == "10 bits"  # raw 不被缩写表筛成空
 
     def test_dual_audio_num(self, fake_mediainfo, monkeypatch):
         import src.core.rename as rename_mod
