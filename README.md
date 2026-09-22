@@ -21,21 +21,23 @@
 
 ### 核心功能
 
-- 🎬 **自动获取PT-Gen简介信息** - 支持多个API源
+- 🎬 **自动获取PT-Gen简介信息** - 支持多个API源 + 备用接口
 - 📋 **MediaInfo信息提取** - 智能媒体分析
 - 📸 **自动截图生成** - 可配置截图参数
 - 🖼️ **缩略图制作** - 自动生成预览图
-- ☁️ **图床上传** - 支持多种图床服务
+- ☁️ **图床上传** - 支持多种图床服务（多线程并发上传）
 - 🏷️ **智能命名** - 根据模板自动生成标题和文件名
 - 📁 **文件整理** - 自动创建目录结构
 - 🌱 **种子制作** - 一键生成torrent文件
+- 🖌️ **海报下载** - 自动下载并上传豆瓣海报
+- 💻 **交互式CLI** - `python src/main_cli.py` 命令行一键发布工作流
 
 ### 高级功能
 
 - 📺 **剧集批量处理** - 支持批量重命名和分集处理
 - 🔗 **硬链接支持** - 节省存储空间
 - 🎭 **短剧特殊处理** - 专门的短剧命名和简介生成
-- 🚀 **API接口** - 完整的RESTful API
+- 🚀 **API接口** - 完整的RESTful API（可选Bearer鉴权 + CORS白名单）
 - 🐳 **Docker支持** - 容器化部署
 
 ## 🚀 快速开始
@@ -44,7 +46,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/publish-helper.git
+git clone https://github.com/bjdbjd/publish-helper.git
 cd publish-helper
 
 # 安装依赖
@@ -115,7 +117,8 @@ docker-compose -f deploy/docker-compose.yml up -d
 
 # 或直接构建
 docker build -f deploy/Dockerfile -t publish-helper .
-docker run -p 15372:15372 publish-helper
+# 映射 API 端口 15372 与 前端 Nginx 端口 15373
+docker run -p 15372:15372 -p 15373:15373 publish-helper
 ```
 
 ## ⚙️ 配置说明
@@ -129,9 +132,8 @@ docker run -p 15372:15372 publish-helper
 API_PORT=15372
 API_DEBUG=false
 
-# PT-Gen配置
-PTGEN_API_URL=https://ptgen.agsvpt.work/
-PTGEN_API_KEY=your_api_key
+# PT-Gen配置（留空则用 static/settings.json 中的默认地址）
+PTGEN_API_URL=
 
 # 图床配置
 IMAGE_HOST_TYPE=freeimage
@@ -148,7 +150,6 @@ LOG_FILE=logs/app.log
 
 - [FreeImage](https://freeimage.host/) - 无需API密钥
 - [ImgBB](https://imgbb.com/) - 需要API密钥
-- [ImageHub](https://www.imagehub.cc/) - 无需API密钥
 - [PixHost](https://pixhost.to/) - 无需API密钥
 
 #### 商业图床
@@ -271,6 +272,19 @@ publish-helper/
 - 完全向后兼容
 - 保持所有原有功能
 - 现有配置自动迁移
+
+### v2.0.0 后续增强 (2026-09)
+
+在 v2.0.0 架构重构基础上持续迭代的稳定性与安全增强：
+
+- **交互式 CLI** - `python src/main_cli.py` 命令行一键发布工作流
+- **豆瓣海报自动下载上传**
+- **API 可选鉴权 + CORS 白名单**（`API_AUTH_TOKEN` / `API_CORS_ORIGINS`，默认关闭、向后兼容）
+- **API 安全加固** - media 目录越权读写、`/api/getFile` 路径逃逸等 S1-S17 系列缺陷修复
+- **核心层缺陷修复** - 中文转数字万进位、PT-Gen 分辨率误判、重命名重复追加扩展名等
+- **截图多线程上传** - 结果按顺序回填、修复乱序与线程生命周期崩溃（`0xC0000409`）
+- **多平台打包发布流水线** - Windows/macOS/Linux 三平台 PyInstaller 产物 + GitHub Release 自动化
+- **打包版数据目录修正** - 用户设置不再因 onefile 临时目录重置，随包静态资源播种
 
 ## 📞 支持
 
