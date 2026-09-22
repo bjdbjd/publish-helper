@@ -2542,7 +2542,7 @@ def api_auto_handle_movie():
         logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'您提供的参数有误，详情请查看服务端日志。',
+            'message': f'您提供的参数有误：{e}',
             'statusCode': 'RUNTIME_ERROR'
         }), 422
 
@@ -2551,7 +2551,7 @@ def api_auto_handle_movie():
         logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'自动处理视频资源失败，详情请查看服务端日志。',
+            'message': f'自动处理视频资源失败：{e}',
             'statusCode': 'RUNTIME_ERROR'
         }), 500
 
@@ -2560,6 +2560,6 @@ def api_auto_handle_movie():
         logger.error('接口异常：%s', e, exc_info=True)
         return jsonify({
             'data': {},
-            'message': f'自动处理视频文件时发生了意外错误，详情请查看服务端日志。',
+            'message': f'自动处理视频文件时发生了意外错误：{e}',
             'statusCode': 'GENERAL_ERROR'
         }), 500

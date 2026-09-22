@@ -86,6 +86,10 @@ def is_filename_too_long(filename: str) -> bool:
 
 
 def delete_season_number(title: str, season_number: str) -> str:
+    # 季号为空或非法时无需裁剪（如电影无季信息，此时 season_number 可能是 ''），
+    # 否则下方 int(season_number) 会抛 ValueError，导致整条命名接口 500。
+    if not season_number or not season_number.isdigit():
+        return title.strip()
     # 仅移除位于标题末尾的季数后缀，避免误伤标题中间的数字
     # （例如 "Ni Hao 1983" 在 season=1 时不应被改写为 "Ni Hao983"）
     title = title.rstrip()

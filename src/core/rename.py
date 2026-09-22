@@ -416,6 +416,16 @@ def get_name_from_template(english_title: str, original_title: str, season: str,
                            bit_depth: str, hdr_format: str, frame_rate: str, audio_codec: str, channels: str, audio_num: str, team: str, other_titles: str,
                            season_number: str, total_episodes: str, playlet_source: str, categories: str, actors: str, template: str) -> str:
     name = get_settings(template)  # 获取模板
+    # 各字段可能为 None（如电影无季，season 为 None；部分解析字段也可能为空），
+    # 统一转成字符串，避免下方 replace(..., None) 抛 TypeError。
+    _fields = (english_title, original_title, season, episode, year, video_format, source, video_codec,
+               bit_depth, hdr_format, frame_rate, audio_codec, channels, audio_num, team, other_titles,
+               season_number, total_episodes, playlet_source, categories, actors)
+    english_title, original_title, season, episode, year, video_format, source, video_codec, bit_depth, \
+        hdr_format, frame_rate, audio_codec, channels, audio_num, team, other_titles, season_number, \
+        total_episodes, playlet_source, categories, actors = \
+        tuple('' if x is None else str(x) for x in _fields)
+
     # 开始替换关键字
     name = name.replace('{en_title}', english_title)
     name = name.replace('{original_title}', original_title)

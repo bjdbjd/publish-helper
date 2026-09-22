@@ -16,7 +16,7 @@ RUN mkdir media  \
     && apt-get install -y libmediainfo0v5 libzen0v5 nginx gettext-base  \
     && cp -r libs/deb/entrypoint entrypoint \
     && chmod +x entrypoint \
-    && cp -r dist /public \
+    && cp -r dist/web /public \
     && cp -r libs/deb/nginx.conf /etc/nginx/nginx.template.conf\
     && pip install -r requirements_api.txt --trusted-host mirrors.aliyun.com --default-timeout=600 -i https://mirrors.aliyun.com/pypi/simple/
 USER root
