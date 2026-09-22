@@ -116,6 +116,9 @@ class mainwindow(QMainWindow, Ui_Mainwindow):
         self._upload_slots = {}       # index -> 上传成功后的图片 URL
         self._slots_to_path = {}      # index -> 本地图片路径（用于 delete_screenshot 按序删除）
         self._upload_total = 0        # 本次上传总张数
+        # 持有运行中的上传线程引用：QThread 若在 run() 期间被垃圾回收销毁，会在 Qt 侧触发
+        # std::terminate/fail-fast（退出码 0xC0000409）。必须持有引用，待线程 finished 后再移除。
+        self._upload_threads = []     # 运行中的 UploadPictureThread 列表
 
         # 初始化
         self.videoPathMovie.setDragEnabled(True)
@@ -469,30 +472,40 @@ class mainwindow(QMainWindow, Ui_Mainwindow):
             self._slots_to_path[idx] = pic  # 记录本地路径，供 delete_screenshot 按序删除
             thread = UploadPictureThread(picture_bed_path, picture_bed_token, pic, False, is_thumbnail, index=idx)
             thread.result_signal.connect(handle_result)  # 连接信号
+            thread.finished.connect(lambda t=thread: self._release_upload_thread(t))
+            self._upload_threads.append(thread)  # 持有引用，避免 run() 期间被 GC 销毁导致 0xC0000409 崩溃
             thread.start()
             print(f'启动线程{idx}')
 
-    def handle_upload_picture_movie_result(self, upload_success, api_response, screenshot_path, is_cover, is_thumbnail,
-                                           index):
-        # 这个函数用于处理上传的结果，它将在主线程中被调用
-        # 多线程并发上传，完成顺序≠截图顺序；这里按 index 收集到槽位，全部完成后再按序回填
-        print('接受到上传图床线程请求的结果')
-        self.debugBrowserMovie.append('接受到上传图床线程请求的结果')
+    def _release_upload_thread(self, thread) -> None:
+        """线程运行结束后移除引用，允许其安全地被垃圾回收。"""
+        if thread in self._upload_threads:
+            self._upload_threads.remove(thread)
+
+    def _handle_upload_receipt(self, upload_success, api_response, index, debug_browser, picture_url_browser,
+                               description_browser) -> None:
+        """收到一个上传线程的结果信号：按 index 收进槽位，全部完成后按序回填 image 框与简介，并按需删除截图。
+
+        三个 tab（电影/剧集/短剧）共用。多线程并发上传完成顺序≠pictures 顺序，故先收齐全部结果再按 index
+        重排一次回填；按 paste_screenshot_url 设置把链接**追加**到简介末尾（不覆盖用户已有简介）。
+        """
+        debug_browser.append('接受到上传图床线程请求的结果')
         if not upload_success:
             self._upload_slots[index] = ''
-            self.debugBrowserMovie.append(f'图床响应无效：{api_response}')
+            debug_browser.append(f'图床响应无效：{api_response}')
         else:
             self._upload_slots[index] = api_response
         if len(self._upload_slots) < self._upload_total:
             return  # 尚未全部完成，等待剩余线程
         # 全部完成：按 pictures 顺序重建
         ordered = [self._upload_slots[i] for i in range(self._upload_total) if self._upload_slots.get(i)]
-        self.pictureUrlBrowserMovie.setText('\n'.join(ordered))
+        picture_url_browser.setText('\n'.join(ordered))
         paste_screenshot_url = bool(get_settings('paste_screenshot_url'))
         delete_screenshot = bool(get_settings('delete_screenshot'))
         if paste_screenshot_url:
-            self.descriptionBrowserMovie.setText('\n'.join(ordered))
-            self.debugBrowserMovie.append('成功将图片链接粘贴到简介后')
+            for url in ordered:
+                description_browser.append(url)
+            debug_browser.append('成功将图片链接粘贴到简介后')
         if delete_screenshot:
             # 逐个删除本地截图（按 pictures 顺序）
             for i in range(self._upload_total):
@@ -501,12 +514,19 @@ class mainwindow(QMainWindow, Ui_Mainwindow):
                     if os.path.exists(p):
                         os.remove(p)
                         print(f'文件"{p}"已被删除')
-                        self.debugBrowserMovie.append(f'文件"{p}"已被删除')
+                        debug_browser.append(f'文件"{p}"已被删除')
                     else:
                         print(f'文件"{p}"不存在。')
-                        self.debugBrowserMovie.append(f'文件"{p}"不存在')
+                        debug_browser.append(f'文件"{p}"不存在')
         self._upload_slots = {}
         self._slots_to_path = {}
+
+    def handle_upload_picture_movie_result(self, upload_success, api_response, screenshot_path, is_cover, is_thumbnail,
+                                           index):
+        # 这个函数用于处理上传的结果，它将在主线程中被调用
+        print('接受到上传图床线程请求的结果')
+        self._handle_upload_receipt(upload_success, api_response, index,
+                                    self.debugBrowserMovie, self.pictureUrlBrowserMovie, self.descriptionBrowserMovie)
 
     def select_video_button_movie_clicked(self):
         path = get_video_file_path()
@@ -1118,36 +1138,9 @@ class mainwindow(QMainWindow, Ui_Mainwindow):
     def handle_upload_picture_tv_result(self, upload_success, api_response, screenshot_path, is_cover, is_thumbnail,
                                         index):
         # 这个函数用于处理上传的结果，它将在主线程中被调用
-        # 多线程并发上传，完成顺序≠截图顺序；这里按 index 收集到槽位，全部完成后再按序回填
         print('接受到上传图床线程请求的结果')
-        self.debugBrowserTV.append('接受到上传图床线程请求的结果')
-        if not upload_success:
-            self._upload_slots[index] = ''
-            self.debugBrowserTV.append(f'图床响应无效：{api_response}')
-        else:
-            self._upload_slots[index] = api_response
-        if len(self._upload_slots) < self._upload_total:
-            return  # 尚未全部完成
-        ordered = [self._upload_slots[i] for i in range(self._upload_total) if self._upload_slots.get(i)]
-        self.pictureUrlBrowserTV.setText('\n'.join(ordered))
-        paste_screenshot_url = bool(get_settings('paste_screenshot_url'))
-        delete_screenshot = bool(get_settings('delete_screenshot'))
-        if paste_screenshot_url:
-            self.descriptionBrowserTV.setText('\n'.join(ordered))
-            self.debugBrowserTV.append('成功将图片链接粘贴到简介后')
-        if delete_screenshot:
-            for i in range(self._upload_total):
-                if i in self._slots_to_path:
-                    p = self._slots_to_path[i]
-                    if os.path.exists(p):
-                        os.remove(p)
-                        print(f'文件"{p}"已被删除')
-                        self.debugBrowserTV.append(f'文件"{p}"已被删除')
-                    else:
-                        print(f'文件"{p}"不存在。')
-                        self.debugBrowserTV.append(f'文件"{p}"不存在')
-        self._upload_slots = {}
-        self._slots_to_path = {}
+        self._handle_upload_receipt(upload_success, api_response, index,
+                                    self.debugBrowserTV, self.pictureUrlBrowserTV, self.descriptionBrowserTV)
 
     def select_video_folder_button_tv_clicked(self):
         path = get_folder_path()
@@ -1706,49 +1699,21 @@ class mainwindow(QMainWindow, Ui_Mainwindow):
     def handle_upload_picture_playlet_result(self, upload_success, api_response, screenshot_path, is_cover, is_thumbnail,
                                              index):
         # 这个函数用于处理上传的结果，它将在主线程中被调用
-        # 多线程并发上传，完成顺序≠截图顺序；这里按 index 收集到槽位，全部完成后再按序回填
         print(f'is_cover: {is_cover}')
-        print('接受到上传图床线程请求的结果')
-        self.debugBrowserPlaylet.append('接受到上传图床线程请求的结果')
         if is_cover:
             # 封面为独立流程，不参与截图排序：粘贴到简介前
             if upload_success:
-                picture_url = api_response
                 paste_screenshot_url = bool(get_settings('paste_screenshot_url'))
                 if paste_screenshot_url:
                     temp = self.descriptionBrowserPlaylet.toPlainText()
-                    self.descriptionBrowserPlaylet.setText(f'{picture_url}\n{temp}')
+                    self.descriptionBrowserPlaylet.setText(f'{api_response}\n{temp}')
                     self.debugBrowserPlaylet.append('成功将封面链接粘贴到简介前')
             else:
                 self.debugBrowserPlaylet.append(f'图床响应无效：{api_response}')
             return
-        if not upload_success:
-            self._upload_slots[index] = ''
-            self.debugBrowserPlaylet.append(f'图床响应无效：{api_response}')
-        else:
-            self._upload_slots[index] = api_response
-        if len(self._upload_slots) < self._upload_total:
-            return  # 尚未全部完成
-        ordered = [self._upload_slots[i] for i in range(self._upload_total) if self._upload_slots.get(i)]
-        self.pictureUrlBrowserPlaylet.setText('\n'.join(ordered))
-        paste_screenshot_url = bool(get_settings('paste_screenshot_url'))
-        delete_screenshot = bool(get_settings('delete_screenshot'))
-        if paste_screenshot_url:
-            self.descriptionBrowserPlaylet.append('\n'.join(ordered))
-            self.debugBrowserPlaylet.append('成功将图片链接粘贴到简介后')
-        if delete_screenshot:
-            for i in range(self._upload_total):
-                if i in self._slots_to_path:
-                    p = self._slots_to_path[i]
-                    if os.path.exists(p):
-                        os.remove(p)
-                        print(f'文件"{p}"已被删除')
-                        self.debugBrowserPlaylet.append(f'文件"{p}"已被删除')
-                    else:
-                        print(f'文件"{p}"不存在')
-                        self.debugBrowserPlaylet.append(f'文件"{p}"不存在')
-        self._upload_slots = {}
-        self._slots_to_path = {}
+        self._handle_upload_receipt(upload_success, api_response, index,
+                                    self.debugBrowserPlaylet, self.pictureUrlBrowserPlaylet,
+                                    self.descriptionBrowserPlaylet)
 
     def select_cover_folder_button_playlet_clicked(self):
         path = get_picture_file_path()
