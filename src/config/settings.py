@@ -80,7 +80,7 @@ class Config:
 
         # GUI Configuration
         self.GUI_TITLE = os.getenv("GUI_TITLE", "Publish Helper")
-        self.GUI_VERSION = os.getenv("GUI_VERSION", "2.0.1")
+        self.GUI_VERSION = os.getenv("GUI_VERSION", "2.0.2")
 
         # PT-Gen Configuration
         self.PTGEN_API_URL = os.getenv("PTGEN_API_URL", "")

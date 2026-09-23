@@ -137,6 +137,33 @@ class TestUploadPicture:
         assert data["pictureBbCode"] == "[img]http://x/u.jpg[/img]"
         assert data["pictureUrl"] == "http://x/u.jpg"  # bbcode[5:-6]
 
+    def test_relative_media_path_resolves(self, api_client, monkeypatch, media_file):
+        """前端目录选择器给的是**相对 media/** 的路径 → 应按 media 根解析后找到文件。
+
+        回归：原先直接把该值交给 upload_picture，其 os.path.exists 按进程 CWD 解析，
+        CWD 不是 media 根，故 `视频.mkv` 这类路径必然报 FILE_PATH_ERROR。
+        """
+        seen = {}
+
+        def _fake(bed_url, token, path):
+            seen["path"] = path
+            return True, "[img]http://x/u.jpg[/img]"
+
+        _set(monkeypatch, "upload_picture", _fake)
+        r = api_client.post("/api/uploadPicture",
+                            json={"picturePath": "视频.mkv", "pictureBedApiUrl": "https://bed/api"})
+        assert r.status_code == 200
+        assert os.path.isabs(seen["path"])  # 已解析成绝对路径
+        assert os.path.basename(seen["path"]) == "视频.mkv"
+
+    def test_out_of_media_existing_file_is_unauthorized(self, api_client, tmp_path):
+        """media 之外**确实存在**的文件 → 401 UNAUTHORIZED（越权兜底）。"""
+        outside = tmp_path / "outside.png"
+        outside.write_bytes(b"x")
+        r = api_client.post("/api/uploadPicture", json={"picturePath": str(outside)})
+        assert r.status_code == 401
+        assert r.get_json()["statusCode"] == "UNAUTHORIZED"
+
 
 class TestGetMediaInfo:
     def test_unauthorized(self, api_client, media_file):
@@ -486,4 +513,25 @@ class TestAutoHandleVideo:
             json={"resourceUrl": "tt1", "path": "../../x", "source": "WEB-DL", "team": "AGSV", "category": "Movie"},
         )
         assert r.status_code == 200  # 流式恒 200
+        assert self._envelope(r)["statusCode"] == "UNAUTHORIZED"
+
+    def test_playlet_missing_title(self, api_client):
+        """短剧不需要 resourceUrl，但必须有 originalTitle。"""
+        r = api_client.post("/api/autoHandleVideo",
+                            json={"path": "some_folder", "team": "AGSV", "category": "Playlet"})
+        assert r.status_code == 200
+        env = self._envelope(r)
+        assert env["statusCode"] == "MISSING_REQUIRED_PARAMETER"
+        assert "短剧名称" in env["message"]
+
+    def test_playlet_cover_outside_media_is_unauthorized(self, api_client, media_file, tmp_path):
+        """封面路径越权（media 之外确实存在的文件）→ UNAUTHORIZED（缺陷①回归）。"""
+        outside = tmp_path / "outside.png"
+        outside.write_bytes(b"x")
+        r = api_client.post(
+            "/api/autoHandleVideo",
+            json={"path": "视频.mkv", "team": "AGSV", "category": "Playlet",
+                  "originalTitle": "短剧名", "coverPath": str(outside)},
+        )
+        assert r.status_code == 200
         assert self._envelope(r)["statusCode"] == "UNAUTHORIZED"

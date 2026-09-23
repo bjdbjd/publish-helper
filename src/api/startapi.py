@@ -108,6 +108,26 @@ def _is_within(target_path: str, allowed_root: str) -> bool:
         return False
 
 
+def _resolve_picture_path(picture_path: str) -> Tuple[str, bool]:
+    """把图片路径参数解析成可用的绝对路径，返回 (路径, 是否在 media 内)。
+
+    前端目录选择器产出的是**相对 media/** 的路径（如 `剧名/cover.jpg`），而
+    `upload_picture` 的 `os.path.exists` 按**进程 CWD** 解析——CWD 不是 media 根，
+    于是这类路径必然找不到文件。故先按 media 根解析一次。
+
+    仅在「原样找不到、而按 media 解析后存在」时才改写，因此绝对路径（含 media 之外
+    的临时目录）行为完全不变，不会引入回归。返回值第二项供调用方做越权判断。
+    """
+    media_root = os.path.abspath(combine_directories('media'))
+    if os.path.exists(picture_path):
+        return picture_path, _is_within(picture_path, media_root)
+    candidate = os.path.abspath(os.path.join(media_root, picture_path))
+    if os.path.exists(candidate):
+        return candidate, _is_within(candidate, media_root)
+    # 两处都不存在：原样返回，交由调用方回 FILE_PATH_ERROR（保持原有报错语义）
+    return picture_path, _is_within(picture_path, media_root)
+
+
 def _to_media_relative(image_path: Any, media_path: str) -> str:
     """把媒体相关路径裁成「相对 media 根」的形式。
 
@@ -501,6 +521,9 @@ def api_upload_picture():
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
             }), 422
 
+        # 前端给的可能是相对 media/ 的路径；先解析（绝对路径行为不变）
+        picture_path, picture_within_media = _resolve_picture_path(picture_path)
+
         if not os.path.exists(picture_path):
             return jsonify({
                 'data': {
@@ -510,6 +533,17 @@ def api_upload_picture():
                 'message': '您提供的图片路径不存在。',
                 'statusCode': 'FILE_PATH_ERROR'
             }), 422
+
+        # 越权兜底：仅当文件确实存在、且落在 media 之外时才拦（临时目录等由绝对路径传入的场景不受影响）
+        if not picture_within_media:
+            return jsonify({
+                'data': {
+                    'pictureBbCode': '',
+                    'pictureUrl': ''
+                },
+                'message': '无权访问此路径下的图片，请把图片储存在media目录下。',
+                'statusCode': 'UNAUTHORIZED'
+            }), 401
 
         picture_bed_api_url = _payload().get('pictureBedApiUrl', default=get_settings('picture_bed_api_url'),
                                                type=str)
@@ -2107,7 +2141,7 @@ def api_get_auto_feed_link():
 # /api/autoHandleVideo 现在流式返回 NDJSON——每到一个阶段边界 yield 一条进度行，
 # 最后一行 yield 结果/错误包络。前端以各行的 'type' / 'statusCode' 区分。
 _AUTO_HANDLE_STAGES = [
-    {'stage': 'PT_GEN_FETCH',      'label': '获取PT-Gen简介'},
+    {'stage': 'PT_GEN_FETCH',      'label': '获取简介'},
     {'stage': 'SCREENSHOT',        'label': '截图并上传图床'},
     {'stage': 'THUMBNAIL',         'label': '生成缩略图并上传'},
     {'stage': 'VIDEO_INFO',        'label': '获取视频信息'},
@@ -2152,13 +2186,23 @@ def api_auto_handle_video_stream():
 # 流水线主体（生成器）。被上方流式路由迭代；参数校验/失败也会作为一条错误包络 yield 出来。
 def _auto_handle_video_pipeline():
     try:
-        resource_url = _payload().get('resourceUrl', default='', type=str)  # 必须信息
+        resource_url = _payload().get('resourceUrl', default='', type=str)  # 必须信息（短剧不需要）
         path = _payload().get('path', default='', type=str)  # 必须信息
-        source = _payload().get('source', default='', type=str)  # 必须信息
+        source = _payload().get('source', default='', type=str)  # 必须信息（短剧用 playletSource）
         team = _payload().get('team', default='', type=str)  # 必须信息
-        category = _payload().get('category', default='', type=str)  # 必须信息
+        category = _payload().get('category', default='', type=str)  # 必须信息：Movie / TV / Playlet
         season = _payload().get('season', default='1', type=str)
         episodes_start_number = _payload().get('episodesStartNumber', default='1', type=str)
+        # 短剧（Playlet）专属：简介由本地字段拼装，不依赖 PT-Gen
+        original_title = _payload().get('originalTitle', default='', type=str)
+        playlet_year = _payload().get('year', default='', type=str)
+        playlet_area = _payload().get('area', default='', type=str)
+        playlet_language = _payload().get('language', default='', type=str)
+        playlet_source = _payload().get('playletSource', default='', type=str)
+        categories = _payload().get('categories', default='', type=str)  # 短剧类型勾选串（剧情 / 动作）
+        season_number_input = _payload().get('seasonNumber', default='', type=str)
+        cover_path = _payload().get('coverPath', default='', type=str)  # 短剧封面（相对 media/）
+        is_playlet = category == 'Playlet'
 
         if season == '':
             season = '1'
@@ -2177,10 +2221,18 @@ def _auto_handle_video_pipeline():
             }, ensure_ascii=False) + '\n'
             return
 
-        if resource_url == '':
+        if resource_url == '' and not is_playlet:
             yield json.dumps({
                 'data': {},
                 'message': '缺少资源链接。',
+                'statusCode': 'MISSING_REQUIRED_PARAMETER'
+            }, ensure_ascii=False) + '\n'
+            return
+
+        if is_playlet and original_title == '':
+            yield json.dumps({
+                'data': {},
+                'message': '缺少短剧名称。',
                 'statusCode': 'MISSING_REQUIRED_PARAMETER'
             }, ensure_ascii=False) + '\n'
             return
@@ -2193,7 +2245,20 @@ def _auto_handle_video_pipeline():
             }, ensure_ascii=False) + '\n'
             return
 
-        if source == '':
+        # 短剧封面：前端目录选择器产出的是**相对 media/** 的路径（不含 media/ 前缀），
+        # 若原样交给 upload_picture，其 os.path.exists 会按进程 CWD 解析而找不到文件。
+        # 先按 media 根解析（绝对路径行为不变），再做越权判断。
+        if is_playlet and cover_path:
+            cover_path, cover_within_media = _resolve_picture_path(cover_path)
+            if not cover_within_media:
+                yield json.dumps({
+                    'data': {},
+                    'message': '无权访问此路径下的封面图片，请把图片储存在media目录下。',
+                    'statusCode': 'UNAUTHORIZED'
+                }, ensure_ascii=False) + '\n'
+                return
+
+        if source == '' and not is_playlet:
             yield json.dumps({
                 'data': {},
                 'message': '缺少资源来源信息。',
@@ -2262,6 +2327,8 @@ def _auto_handle_video_pipeline():
             torrent_file_url: str
             '''重命名后的新路径（相对 media/），供前端回写 flow.path'''
             new_path: str
+            '''原始规格（未做命名缩写筛除），供前端如实展示（同 /api/getVideoInfo 的 data.raw）'''
+            raw: dict
             '''视频编码'''
             video_codec: str
             '''分辨率'''
@@ -2289,6 +2356,7 @@ def _auto_handle_video_pipeline():
             team='',
             torrent_file_url='/api/getFile?filePath=',
             new_path='',
+            raw={},
             video_codec='',
             video_format='', )
         data_instance.source = source
@@ -2297,6 +2365,8 @@ def _auto_handle_video_pipeline():
             data_instance.category = '电影'
         if category == 'TV':
             data_instance.category = '剧集'
+        if category == 'Playlet':
+            data_instance.category = '短剧'
         if 'AGSV' in team:
             data_instance.tags.extend(['官方', '冰种'])
 
@@ -2318,19 +2388,25 @@ def _auto_handle_video_pipeline():
         do_get_thumbnail = bool(get_settings('do_get_thumbnail'))
         delete_screenshot = bool(get_settings('delete_screenshot'))
 
-        # 获取pt_gen简介
-        yield _progress('PT_GEN_FETCH', '正在获取PT-Gen简介')
-        get_pt_gen_description_success, response = get_pt_gen_description(pt_gen_api_url, resource_url)
-        if not get_pt_gen_description_success:
-            # 一次不成功，再试一次
+        # 获取简介：短剧由本地字段拼装（无 PT-Gen），其它走 PT-Gen
+        if is_playlet:
+            yield _progress('PT_GEN_FETCH', '正在生成短剧简介')
+            playlet_season_number = season_number_input or season or '1'
+            data_instance.description = get_playlet_description(original_title, playlet_year, playlet_area,
+                                                                categories, playlet_language, playlet_season_number)
+        else:
+            yield _progress('PT_GEN_FETCH', '正在获取PT-Gen简介')
             get_pt_gen_description_success, response = get_pt_gen_description(pt_gen_api_url, resource_url)
             if not get_pt_gen_description_success:
-                raise RuntimeError(f'获取PT-Gen简介失败：{response}')
+                # 一次不成功，再试一次
+                get_pt_gen_description_success, response = get_pt_gen_description(pt_gen_api_url, resource_url)
+                if not get_pt_gen_description_success:
+                    raise RuntimeError(f'获取PT-Gen简介失败：{response}')
 
-        # response is now (format_data, full_data)
-        format_data, full_data = response
-        # _log(f'获取到pt_gen响应：{format_data}')
-        data_instance.description = format_data
+            # response is now (format_data, full_data)
+            format_data, full_data = response
+            # _log(f'获取到pt_gen响应：{format_data}')
+            data_instance.description = format_data
 
         # 获取截图
         if screenshot_number >= 0:
@@ -2444,7 +2520,7 @@ def _auto_handle_video_pipeline():
             else:
                 raise ValueError(f'缩略图的行列数均需要大于0，您设置的行数为{thumbnail_rows}，列数为{thumbnail_cols}')
 
-        # 获取VideoInfo
+        # 获取VideoInfo（短剧同样解析视频参数——对齐 GUI startgui.py:1828）
         is_video_path, response = check_path_and_find_video(path)  # 视频资源的路径
         if is_video_path == 1 or is_video_path == 2:
             video_path = response
@@ -2461,36 +2537,48 @@ def _auto_handle_video_pipeline():
                 data_instance.channels = response[6]
                 data_instance.audio_num = response[7]
                 data_instance.tags.extend(response[8])
+                # 原始规格（未做命名缩写筛除），供前端如实展示；同 /api/getVideoInfo 的 data.raw
+                data_instance.raw = response[9] if len(response) > 9 else {}
             else:
                 raise RuntimeError(f'获取VideoInfo失败：{response[0]}')
         else:
             raise ValueError(f'资源的路径不正确：{response}')
 
-        # 获取PT-GenInfo
-        _log(f'获取PT-GenInfo，从{data_instance.description}')
-        yield _progress('PARSE_DESCRIPTION', '正在解析简介字段')
-        original_title, english_title, year, other_names_sorted, categories, actors_list, episodes, season = get_pt_gen_info(
-            data_instance.description)
-        _log(original_title, english_title, year, other_names_sorted, categories, actors_list)
-        # 英文名为空且原名是中文时，用拼音兜底（对齐 PyQt 版行为）
-        english_title = fill_english_title(original_title, english_title or '')
-        actors = ''
-        other_titles = ''
-        is_first = True
+        # 简介字段来源：短剧直接用表单字段（无 PT-Gen），其它解析 PT-Gen 简介
+        if is_playlet:
+            year = playlet_year
+            # 短剧原名即表单「剧名」；英文名用拼音兜底（对齐 GUI：中文原名 → 汉语拼音）
+            english_title = fill_english_title(original_title, '')
+            other_titles = ''
+            actors = ''
+            episodes = None
+            season = season_number_input or season or '1'
+        else:
+            # 获取PT-GenInfo
+            _log(f'获取PT-GenInfo，从{data_instance.description}')
+            yield _progress('PARSE_DESCRIPTION', '正在解析简介字段')
+            original_title, english_title, year, other_names_sorted, categories, actors_list, episodes, season = get_pt_gen_info(
+                data_instance.description)
+            _log(original_title, english_title, year, other_names_sorted, categories, actors_list)
+            # 英文名为空且原名是中文时，用拼音兜底（对齐 PyQt 版行为）
+            english_title = fill_english_title(original_title, english_title or '')
+            actors = ''
+            other_titles = ''
+            is_first = True
 
-        for data in actors_list:  # 把演员名转化成str
-            if is_first:
-                actors += data
-                is_first = False
-            else:
-                actors += ' / '
-                actors += data
+            for data in actors_list:  # 把演员名转化成str
+                if is_first:
+                    actors += data
+                    is_first = False
+                else:
+                    actors += ' / '
+                    actors += data
 
-        for data in other_names_sorted:  # 把别名转化为str
-            other_titles += data
-            other_titles += ' / '
+            for data in other_names_sorted:  # 把别名转化为str
+                other_titles += data
+                other_titles += ' / '
 
-        other_titles = other_titles[: -3]
+            other_titles = other_titles[: -3]
 
         # 给个位数的季数前面补0（season 来自 get_pt_gen_info，类型 Optional[int]，先转 str 再补）
         season_number = str(season) if season is not None else ''
@@ -2501,7 +2589,7 @@ def _auto_handle_video_pipeline():
         yield _progress('TOTAL_EPISODE', '正在获取总集数')
         total_episodes = ''
         episodes_num = 0
-        if category == 'TV':
+        if category == 'TV' or is_playlet:
             is_video_path, response = check_path_and_find_video(path)  # 视频资源的路径
             if is_video_path == 2:  # 视频路径是文件夹
                 get_video_files_success, video_files = get_video_files(path)  # 获取文件夹内部的所有文件
@@ -2509,7 +2597,9 @@ def _auto_handle_video_pipeline():
                     episodes_start_number = 1  # 默认从第一集开始
                     _log('检测到以下文件：', video_files)
                     episodes_num = len(video_files)  # 获取视频文件的总数
-                    if episodes_start_number == 1 and episodes == episodes_num:
+                    # 短剧无 PT-Gen 声明的集数（episodes 为 None），对齐 GUI：起始为1且不止一集即「全N集」
+                    is_whole_collection = (episodes_num != 1) if is_playlet else (episodes == episodes_num)
+                    if episodes_start_number == 1 and is_whole_collection:
                         total_episodes = f'全{str(episodes_num)}集'
                         data_instance.tags.append('合集')
                     else:
@@ -2536,7 +2626,7 @@ def _auto_handle_video_pipeline():
                                                           data_instance.audio_codec, data_instance.channels,
                                                           data_instance.audio_num, data_instance.team, other_titles,
                                                           season_number,
-                                                          total_episodes, '', categories, actors, template)
+                                                          total_episodes, playlet_source, categories, actors, template)
         _log(f'获取到主标题是{data_instance.main_title}')
 
         # 获取副标题
@@ -2549,7 +2639,7 @@ def _auto_handle_video_pipeline():
                                                             data_instance.audio_codec, data_instance.channels,
                                                             data_instance.audio_num, data_instance.team, other_titles,
                                                             season_number,
-                                                            total_episodes, '', categories, actors, template)
+                                                            total_episodes, playlet_source, categories, actors, template)
         _log(f'获取到副标题是{data_instance.second_title}')
 
         # 获取文件名
@@ -2562,7 +2652,7 @@ def _auto_handle_video_pipeline():
                                                          data_instance.audio_codec, data_instance.channels,
                                                          data_instance.audio_num, data_instance.team, other_titles,
                                                          season_number,
-                                                         total_episodes, '', categories, actors, template)
+                                                         total_episodes, playlet_source, categories, actors, template)
         _log(f'获取到文件名是{data_instance.file_name}')
 
         yield _progress('RENAME_MOVE', '正在重命名/移动文件')
@@ -2608,8 +2698,8 @@ def _auto_handle_video_pipeline():
                     raise RuntimeError(f'对影片资源视频重命名失败：{response}')
             else:
                 raise ValueError(f'影片资源的路径不正确：{response}')
-        if category == 'TV':
-            # 给剧集重命名
+        if category == 'TV' or is_playlet:
+            # 给剧集/短剧重命名
             is_video_path, response = check_path_and_find_video(path)  # 视频资源的路径
             if is_video_path == 2:  # 视频路径是文件夹
                 get_video_files_success, video_files = get_video_files(path)  # 获取文件夹内部的所有文件
@@ -2659,17 +2749,32 @@ def _auto_handle_video_pipeline():
         else:
             raise ValueError(f'资源的路径不正确：{response}')
 
-        yield _progress('ANALYZE_PARAMS', '正在分析关键参数')
-        _log('开始分析其他关键参数')
-        (data_instance.imdb_url, data_instance.douban_url, data_instance.category, data_instance.area,
-         data_instance.video_format,
-         data_instance.audio_codec, data_instance.video_codec, data_instance.medium) \
-            = get_data_from_pt_gen_description(data_instance.main_title, data_instance.description,
-                                               data_instance.media_info, data_instance.source, data_instance.category)
-        # _log('获得的参数：', data_instance.main_title, data_instance.second_title, data_instance.imdb_url,
-        #       data_instance.douban_url, data_instance.description, data_instance.media_info, data_instance.category,
-        #       data_instance.area, data_instance.video_format, data_instance.audio_codec, data_instance.video_codec,
-        #       data_instance.medium, data_instance.team)
+        # 分析关键参数：短剧字段已由表单/本地简介确定，跳过（避免覆盖 category='短剧'、area 与空视频参数）
+        if not is_playlet:
+            yield _progress('ANALYZE_PARAMS', '正在分析关键参数')
+            _log('开始分析其他关键参数')
+            (data_instance.imdb_url, data_instance.douban_url, data_instance.category, data_instance.area,
+             data_instance.video_format,
+             data_instance.audio_codec, data_instance.video_codec, data_instance.medium) \
+                = get_data_from_pt_gen_description(data_instance.main_title, data_instance.description,
+                                                   data_instance.media_info, data_instance.source, data_instance.category)
+            # _log('获得的参数：', data_instance.main_title, data_instance.second_title, data_instance.imdb_url,
+            #       data_instance.douban_url, data_instance.description, data_instance.media_info, data_instance.category,
+            #       data_instance.area, data_instance.video_format, data_instance.audio_codec, data_instance.video_codec,
+            #       data_instance.medium, data_instance.team)
+
+        # 短剧封面：上传图床并附加到简介（对齐 GUI 短剧「上传封面」）。
+        # 封面是可选步骤，失败**不中断发布**（对齐 GUI：仅提示不 raise），否则一张封面会毁掉整轮发布。
+        if is_playlet and cover_path:
+            upload_picture_success, response = upload_picture(picture_bed_api_url, picture_bed_api_token, cover_path)
+            if not upload_picture_success:
+                # 一次不成功，再试一次
+                upload_picture_success, response = upload_picture(picture_bed_api_url, picture_bed_api_token,
+                                                                  cover_path)
+            if upload_picture_success:
+                data_instance.description += '\n' + response
+            else:
+                _log(f'上传封面到图床失败，已跳过封面（不中断发布）：{response}')
 
         # 开始制作种子
         torrent_storage_path = get_settings('torrent_storage_path')

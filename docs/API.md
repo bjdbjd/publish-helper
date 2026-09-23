@@ -530,22 +530,44 @@ curl -X POST "http://localhost:15372/api/settings/update" \
 
 ### 11.1 `POST /api/autoHandleVideo`
 
-**最重的端点，副作用极大**：一次完成「取 PT-Gen 简介 + 截图上传 + 缩略图上传 + 命名 + 重命名 + 制作种子 + 返回全套发布数据」。**会改动磁盘上的文件和目录**（重命名、塞文件夹、删截图），慎用。
+**最重的端点，副作用极大**：一次完成「取简介 + 截图上传 + 缩略图上传 + 命名 + 重命名 + 制作种子 + 返回全套发布数据」。**会改动磁盘上的文件和目录**（重命名、塞文件夹、删截图），慎用。
+
+- `category=Movie|TV`：简介走 PT-Gen（需 `resourceUrl`）。
+- `category=Playlet`（短剧）：简介由本地表单字段拼装（**不需要** `resourceUrl`），跳过视频参数解析与非短剧的「分析关键参数」，并对文件夹内剧集做批量重命名（同 TV）。
+
+**流式返回（NDJSON）**：HTTP 恒为 `200`，响应体是逐行的 JSON——每到一个阶段边界输出一条进度事件，最后输出结果/错误包络。每行用 `\n` 分隔：
+
+```jsonc
+{"type":"progress","stage":"PT_GEN_FETCH","label":"获取PT-Gen简介","percent":9,"message":"正在获取PT-Gen简介"}   // 进度行（11 个 stage，顺序见后端 _AUTO_HANDLE_STAGES）
+{"data":{...},"message":"获取成功。","statusCode":"OK"}                                                      // 末行：结果包络（statusCode 判成败）
+```
+
+前端以 `statusCode` 判成败；校验失败（缺参/越权）也会作为一条错误包络输出（HTTP 仍为 200），不再单独 4xx。
 
 | 参数 | 必需 | 类型 | 默认 | 说明 |
 |---|---|---|---|---|
-| `resourceUrl` | ✓ | string | — | 豆瓣 / IMDB 链接 |
-| `path` | ✓ | string | — | 相对 `media/`（Movie=文件或目录，TV=**必须文件夹**） |
-| `source` | ✓ | string | — | 资源来源 |
+| `resourceUrl` | Movie/TV ✓ | string | — | 豆瓣 / IMDB 链接（短剧不需要） |
+| `path` | ✓ | string | — | 相对 `media/`（Movie=文件或目录，TV/Playlet=**必须文件夹**） |
+| `source` | Movie/TV ✓ | string | — | 资源来源（短剧用「资源来源」，对应模板 `{source}`） |
 | `team` | ✓ | string | — | 制作组（含 `AGSV` 自动加标签 `官方`,`冰种`） |
-| `category` | ✓ | string | — | `Movie` / `TV`（`Movie`→电影，`TV`→剧集） |
+| `category` | ✓ | string | — | `Movie` / `TV` / `Playlet`（→电影 / 剧集 / 短剧） |
 | `season` |  | string | `1` | 季号 |
 | `episodesStartNumber` |  | int | `1` | 起始集号（TV 分支内部实际硬编码为 1） |
+| `originalTitle` | Playlet ✓ | string | — | 短剧名称（短剧必填，用于拼简介与命名） |
+| `year` |  | string | — | 短剧年份 |
+| `area` |  | string | — | 短剧产地 |
+| `language` |  | string | — | 短剧语言 |
+| `playletSource` |  | string | — | 短剧来源（模板 `{playlet_source}`） |
+| `categories` |  | string | — | 短剧类型勾选串（如 `恐怖 / 动作`，模板 `{categories}`） |
+| `seasonNumber` |  | string | — | 短剧季数（拼接简介用） |
+| `coverPath` |  | string | — | 短剧封面（相对 `media/`），上传图床后追加到简介；越权→`UNAUTHORIZED`，**上传失败不中断发布**（仅跳过封面） |
 
-**成功 `200`**：`data` 为 camelCase 字段，主要含：
-`resourceUrl, area, audioCodec, audioNum, bitDepth, category, channels, description, doubanUrl, fileName, frameRate, hdrFormat, imdbUrl, mediaInfo, medium, mainTitle, secondTitle, source, tags[], team, torrentFileUrl, videoCodec, videoFormat`。
+**成功**（末行 `statusCode=OK`）：`data` 为 camelCase 字段，主要含：
+`resourceUrl, area, audioCodec, audioNum, bitDepth, category, channels, description, doubanUrl, fileName, frameRate, hdrFormat, imdbUrl, mediaInfo, medium, mainTitle, newPath, raw, secondTitle, source, tags[], team, torrentFileUrl, videoCodec, videoFormat`。
 
-**失败**：越权→`401`；缺 `resourceUrl/path/source/team/category`→`422`；参数/取值错误→`422 RUNTIME_ERROR`；运行时失败（截图/上传/重命名/制种）→`500 RUNTIME_ERROR`；未预期异常→`500 GENERAL_ERROR`。
+其中：
+- `newPath`（相对 `media/`）是重命名后磁盘上的新路径，供前端回写 `flow.path`（一键发布会改名磁盘，前端路径会过期）。
+- `raw` 是未做命名缩写筛除的原始规格 dict（`videoFormatRaw`/`bitDepthRaw`/`frameRateRaw`/…，同 `/api/getVideoInfo` 的 `data.raw`），供前端如实展示真实参数——命名口径字段（`bitDepth`/`frameRate`/…）会按 PT 惯例把默认值置空，前端展示卡用 `raw` 回退。
 
 > ⚠️ 已知限制（v2.0.0）：TV 分支 `episodes_start_number` 被硬编码为 `1`，传入的 `episodesStartNumber` 被忽略。
 

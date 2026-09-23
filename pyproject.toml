@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "publish-helper"
-version = "2.0.1"
+version = "2.0.2"
 description = "A comprehensive PT (Private Tracker) resource publishing assistant with modern Python architecture"
 readme = "README.md"
 license = {file = "LICENSE"}

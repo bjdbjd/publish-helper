@@ -229,6 +229,64 @@ class TestS13TotalEpisodeBranches:
         assert r.get_json()["data"]["totalEpisode"] == "第5集"
 
 
+# ------------------------------------- 短剧命名：预览口径 == 一键发布口径
+
+class TestPlayletNamingParity:
+    """短剧「生成命名」预览与「一键自动发布」必须产出同一套名字。
+
+    两条路径的入参口径历史上不一致（预览发未补零的 season、不传 totalEpisode；
+    一键发布由后端补零并自算集数），会出现「预览 S2 / 发布 S02」「预览缺集数」。
+    本用例锁定对齐后的口径：只要前端按同一组入参调用，两边结果就相同。
+    短剧单集时发布侧是「第1集」（不是 getTotalEpisode 的「全1集」），一并锁定。
+    """
+
+    def _playlet_folder(self, monkeypatch, media_file, count):
+        files = [str(media_file.parent / f"e{i}.mkv") for i in range(1, count + 1)]
+        _set(monkeypatch, "check_path_and_find_video", lambda p: (2, str(media_file.parent)))
+        _set(monkeypatch, "get_video_files", lambda p: (True, files))
+        _set(monkeypatch, "get_video_info", lambda p: (True, ["1080p", "x264", "", "", "", "", "", "", [], {}]))
+        _set(monkeypatch, "get_media_info", lambda p: (True, "MI"))
+        _set(monkeypatch, "get_screenshot", lambda *a, **k: (True, []))
+        _set(monkeypatch, "get_thumbnail", lambda *a, **k: (True, str(media_file.parent / "t.png")))
+        _set(monkeypatch, "make_torrent", lambda p, st: (True, os.path.join(str(st), "x.torrent")))
+        _set(monkeypatch, "rename_file", lambda f, n: (True, str(media_file.parent / (n + ".mkv"))))
+        _set(monkeypatch, "rename_folder", lambda d, n: (True, str(media_file.parent / n)))
+        _set(monkeypatch, "upload_picture", lambda u, t, p: (True, "[img]http://bed/x[/img]"))
+        return files
+
+    def _publish(self, api_client):
+        r = api_client.post("/api/autoHandleVideo", json={
+            "path": "视频.mkv", "team": "AGSVWEB", "category": "Playlet",
+            "originalTitle": "短剧名", "year": "2023", "season": "01",
+            "source": "WEB-DL", "categories": "剧情"})
+        lines = [ln for ln in r.get_data(as_text=True).splitlines() if ln.strip()]
+        return json.loads(lines[-1])
+
+    @pytest.mark.parametrize("count,expected_episode", [(3, "全3集"), (1, "第1集")])
+    def test_preview_matches_publish(self, api_client, monkeypatch, media_file, count, expected_episode):
+        self._playlet_folder(monkeypatch, media_file, count)
+
+        env = self._publish(api_client)
+        assert env["statusCode"] == "OK", env.get("message")
+        data = env["data"]
+
+        # 前端「生成命名」预览按同一口径调用（season 已补零、totalEpisode 按发布规则取）
+        base = {
+            "originalTitle": "短剧名", "englishTitle": "", "year": "2023",
+            "season": "01", "seasonNumber": "1", "totalEpisode": expected_episode,
+            "playletSource": "", "source": "WEB-DL", "team": "AGSVWEB",
+            "category": "剧情", "videoFormat": "1080p", "videoCodec": "x264",
+        }
+        preview_main = api_client.get("/api/getNameFromTemplate",
+                                      query_string=dict(base, template="main_title_playlet")).get_json()["data"]["name"]
+        preview_second = api_client.get("/api/getNameFromTemplate",
+                                        query_string=dict(base, template="second_title_playlet")).get_json()["data"]["name"]
+
+        assert preview_main == data["mainTitle"]
+        assert preview_second == data["secondTitle"]
+        assert expected_episode in data["secondTitle"]  # 预览不再缺集数位
+
+
 # ------------------------------------------------------ S15 settings/update 覆写
 
 class TestS15SettingsUpdateMerges:

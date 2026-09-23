@@ -471,6 +471,9 @@ def get_name_from_template(english_title: str, original_title: str, season: str,
         name = name.replace('标 / 简', '')  # 避免演员无中文名
         if name[:3] == ' | ':
             name = name[3:]  # 避免只有英文标题导致错误
+        # 别名 / 集数等中间段为空时，模板会产生连续的 ' | | '；合并成单个 ' | '。
+        # 仅折叠“仅空白相邻的多个 |”，内容夹在中间的合法分隔（'剧情 / 惊悚 | 演员'）不受影响。
+        name = re.sub(r'\s*\|\s*(\|\s*)+', ' | ', name)
     if 'file_name' in template:
         name = re.sub(r'[<>:\'/\\|?*\s]', '.', name)  # 将Windows不允许出现的字符变成'.'
         name = re.sub(r'\.{2,}', '.', name)  # 将连续的'.'变成一个
