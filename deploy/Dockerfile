@@ -1,6 +1,8 @@
-# syntax=docker/dockerfile:1
-#
 # Publish Helper 统一镜像：Vue 前端 + Flask API + nginx 同一个容器。
+#
+# 不开 `# syntax=docker/dockerfile:1`：那会让构建先联网拉
+# docker/dockerfile:1 这个前沿镜像，本仓库用不到 heredoc / --mount 之类特性，
+# 在国内网络下反而成了构建失败点（TLS handshake timeout）。
 #
 # 构建（context 必须是**两个仓库的公共父目录**，即 GitHub/）：
 #   cd ..
