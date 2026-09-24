@@ -91,9 +91,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # 国内 runner 可改镜像源；默认官方源
+          # 默认用 npmmirror：package-lock.json 的 resolved 全部指向该源
           build-args: |
-            NPM_REGISTRY=https://registry.npmjs.org/
+            NPM_REGISTRY=https://registry.npmmirror.com/
             VITE_API_AUTH_TOKEN=
 
       - name: Image digest

@@ -22,7 +22,7 @@ services:
         # 后端若启用鉴权（API_AUTH_TOKEN），这里要填相同 token。
         # 注意该值会被内联进前端产物，仅在**构建时**生效。
         VITE_API_AUTH_TOKEN: ${VITE_API_AUTH_TOKEN:-}
-        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com/}
     image: ghcr.io/bjdbjd/publish-helper:${IMAGE_TAG:-latest}
     container_name: publish-helper
     ports:

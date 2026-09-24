@@ -26,8 +26,11 @@ WORKDIR /build
 COPY publish-helper-vue/package.json publish-helper-vue/package-lock.json ./
 
 # npm ci 严格按 lockfile 安装，构建可复现。
-# 国内 CI 可用 --build-arg NPM_REGISTRY=... 换镜像源。
-ARG NPM_REGISTRY=https://registry.npmjs.org/
+# 默认 registry 用 npmmirror：package-lock.json 里 515 条 resolved 全部指向
+# registry.npmmirror.com，npm ci 会**按 resolved 直接下载**，所以这里换源并不能
+# 改变 tarball 来源——默认值只影响少数按 registry 解析的请求（如 peer 依赖补装）。
+# 设成与 lockfile 同源可避免"配置与锁文件两套源"的困惑。
+ARG NPM_REGISTRY=https://registry.npmmirror.com/
 RUN npm config set registry "$NPM_REGISTRY" \
     && npm ci --no-audit --no-fund
 
@@ -76,7 +79,10 @@ RUN apt-get update \
 # --- 应用代码 -------------------------------------------------------------
 COPY publish-helper/src src
 COPY publish-helper/static static
-COPY publish-helper/libs/pinyin libs/pinyin
+# 注意：**不拷** libs/pinyin/Mandarin.dat。xpinyin 是用
+# `Path(__file__).with_name('Mandarin.dat')` 从**自己包目录**读数据表的，
+# wheel 里已自带同名文件；仓库里那份是给 PyInstaller 打包用的（见
+# packaging/publish_helper.spec），容器里拷进来也不会被读到。
 COPY publish-helper/deploy/requirements_api.txt requirements_api.txt
 COPY publish-helper/libs/deb/entrypoint entrypoint
 COPY publish-helper/libs/deb/nginx.conf /etc/nginx/nginx.template.conf

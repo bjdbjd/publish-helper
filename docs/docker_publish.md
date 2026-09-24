@@ -34,7 +34,8 @@ make docker-build
 ```
 
 > 前端是**独立仓库**（不做成 submodule），所以不能只在后端根目录下构建。
-> 国内网络可用 `--build-arg NPM_REGISTRY=https://registry.npmmirror.com/` 加速 npm 安装。
+> npm 默认源是 `registry.npmmirror.com`（与 package-lock.json 的 resolved 同源）。
+> 需要改源时用 `--build-arg NPM_REGISTRY=https://registry.npmjs.org/`。
 
 ## 3. 手动推送到 GHCR
 
