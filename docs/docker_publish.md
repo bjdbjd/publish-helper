@@ -1,37 +1,61 @@
 # 镜像发布
 
-> 1.本文档指导研发人员发布镜像  
-> 2.推送到镜像仓库
+> 面向维护者：构建并发布**统一镜像**（Vue 前端 + Flask API + nginx 同容器）到 GHCR。
 
-## 1.编译镜像
+镜像地址：`ghcr.io/bjdbjd/publish-helper:<版本>`
 
-> 此步骤将从 git 仓库拉取最新代码，构建镜像并推送到镜像仓库。
+## 1. 自动发布（推荐）
 
-登录服务器，在可用目录下执行以下命令：
+推 tag 即触发 `.github/workflows/docker.yml` 构建并推送，同时打上版本号与 `latest`：
 
 ```shell
-# 此变量为版本，后续将此shell改为build.sh脚本，版本从项目配置文件获取
-git clone git@github.com:bjdbjd/publish-helper.git
-PROJECT_VERSION=2.0.0
+git tag v2.0.2
+git push origin v2.0.2
+```
+
+工作流会 checkout **两个仓库**（`publish-helper` 与 `publish-helper-vue`）到同级目录，
+再以父目录为 context 构建——与本地布局一致。也可在 Actions → Docker Image → Run workflow 手动触发。
+
+## 2. 本地构建
+
+统一镜像需要前端源码，因此 **context 必须是两个仓库的公共父目录**，且两个仓库须同级：
+
+```shell
+# 目录结构：/<parent>/publish-helper 与 /<parent>/publish-helper-vue
+cd /<parent>
+docker build -f publish-helper/deploy/Dockerfile -t publish-helper:local .
+```
+
+或直接用 Makefile（会自动 cd 到父目录）：
+
+```shell
 cd publish-helper
-docker build --no-cache --progress=plain -t bdjbjd/publish-helper:${PROJECT_VERSION} -f deploy/Dockerfile .
+make docker-build
 ```
 
-## 2.推送镜像
+> 前端是**独立仓库**（不做成 submodule），所以不能只在后端根目录下构建。
+> 国内网络可用 `--build-arg NPM_REGISTRY=https://registry.npmmirror.com/` 加速 npm 安装。
+
+## 3. 手动推送到 GHCR
 
 ```shell
-# 当前不推送到公共仓库，正式发布补充，合并到上面build.sh脚本中
+echo $GITHUB_TOKEN | docker login ghcr.io -u <用户名> --password-stdin
+docker tag publish-helper:local ghcr.io/bjdbjd/publish-helper:2.0.2
+docker tag publish-helper:local ghcr.io/bjdbjd/publish-helper:latest
+docker push ghcr.io/bjdbjd/publish-helper:2.0.2
+docker push ghcr.io/bjdbjd/publish-helper:latest
 ```
 
-## 启动
-> 正式发布docker版本后，启动部分迁移到用户使用部署  
-> 使用此目录下`publish-helper.yml`启动，需要修改其中镜像版本
+## 4. 用户侧启动
+
+见 `deploy/docker-compose.yml`。用户只需拉取镜像，把 `static/`（配置）与 `media/`
+（资源）挂上即可；界面在 **15373** 端口（nginx 同时提供界面与 `/api` 反代），
+15372 是容器内的 Flask，默认不对宿主暴露。
 
 ```shell
-# 在编译服务器上直接可以启动，正式发布后需要拉取镜像
-# 停止
-docker-compose -f publish-helper.yml down
-# 启动
-docker-compose -f publish-helper.yml up -d
+docker compose -f deploy/docker-compose.yml up -d
 ```
 
+首次启动时，entrypoint 会把镜像内自带的静态数据文件（`abbreviation.json`、
+`combo-box-data.json`、`picture-bed-data.json`、`ph-bjd.ico`）**按缺失补种**到挂载出来的
+`static/`，并生成默认 `settings.json`；此后用户改动不会被覆盖。

@@ -1,0 +1,13 @@
+Flask==3.0.2
+flask-cors==3.0.10
+# src/config/settings.py 无条件 `from dotenv import load_dotenv`，而 Flask 只在
+# 自己的 `dotenv` extra（Flask[dotenv]）里声明它，默认安装不会被拉进来。
+# 缺了它容器启动即 ModuleNotFoundError，故必须显式列出。
+python-dotenv==1.0.1
+pymediainfo==6.1.0
+requests==2.31.0
+numpy==1.26.4
+opencv-python-headless==4.9.0.80
+xpinyin==0.7.6
+torf==4.2.6
+pillow==10.3.0

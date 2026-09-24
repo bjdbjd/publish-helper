@@ -1,6 +1,6 @@
 {
-    "api_port": "5372",
-    "auto_feed_link": "https://example.com/upload.php#separator#name#linkstr#{\u4e3b\u6807\u9898}#linkstr#small_descr#linkstr#{\u526f\u6807\u9898}#linkstr#url#linkstr#{IMDB}#linkstr#dburl#linkstr#{\u8c46\u74e3}#linkstr#descr#linkstr#{\u7b80\u4ecb}[quote]{MediaInfo}[/quote]#linkstr#log_info#linkstr##linkstr#tracklist#linkstr##linkstr#music_type#linkstr##linkstr#music_media#linkstr##linkstr#edition_info#linkstr##linkstr#music_name#linkstr##linkstr#music_author#linkstr##linkstr#animate_info#linkstr##linkstr#anidb#linkstr##linkstr#torrentName#linkstr##linkstr#images#linkstr##linkstr#torrent_name#linkstr#{\u79cd\u5b50\u540d\u79f0}#linkstr#torrent_url#linkstr#{\u79cd\u5b50\u94fe\u63a5}#linkstr#type#linkstr#{\u7c7b\u578b}#linkstr#source_sel#linkstr#{\u5730\u533a}#linkstr#standard_sel#linkstr#{\u5206\u8fa8\u7387}#linkstr#audiocodec_sel#linkstr#{\u97f3\u9891\u7f16\u7801}#linkstr#codec_sel#linkstr#{\u89c6\u9891\u7f16\u7801}#linkstr#medium_sel#linkstr#{\u5a92\u4ecb}#linkstr#origin_site#linkstr#{\u5c0f\u7ec4}#linkstr#origin_url#linkstr##linkstr#golden_torrent#linkstr#false#linkstr#mediainfo_cmct#linkstr##linkstr#imgs_cmct#linkstr##linkstr#full_mediainfo#linkstr##linkstr#subtitles#linkstr##linkstr#youtube_url#linkstr##linkstr#ptp_poster#linkstr##linkstr#comparisons#linkstr##linkstr#version_info#linkstr##linkstr#multi_mediainfo#linkstr##linkstr#labels#linkstr#0",
+    "api_port": "15372",
+    "auto_feed_link": "https://www.agsvpt.com/upload.php#separator#name#linkstr#{主标题}#linkstr#small_descr#linkstr#{副标题}#linkstr#url#linkstr#{IMDB}#linkstr#dburl#linkstr#{豆瓣}#linkstr#descr#linkstr#{简介}[quote]{MediaInfo}[/quote]#linkstr#log_info#linkstr##linkstr#tracklist#linkstr##linkstr#music_type#linkstr##linkstr#music_media#linkstr##linkstr#edition_info#linkstr##linkstr#music_name#linkstr##linkstr#music_author#linkstr##linkstr#animate_info#linkstr##linkstr#anidb#linkstr##linkstr#torrentName#linkstr##linkstr#images#linkstr##linkstr#torrent_name#linkstr#{种子名称}#linkstr#torrent_url#linkstr#{种子链接}#linkstr#type#linkstr#{类型}#linkstr#source_sel#linkstr#{地区}#linkstr#standard_sel#linkstr#{分辨率}#linkstr#audiocodec_sel#linkstr#{音频编码}#linkstr#codec_sel#linkstr#{视频编码}#linkstr#medium_sel#linkstr#{媒介}#linkstr#origin_site#linkstr#{小组}#linkstr#origin_url#linkstr##linkstr#golden_torrent#linkstr#false#linkstr#mediainfo_cmct#linkstr##linkstr#imgs_cmct#linkstr##linkstr#full_mediainfo#linkstr##linkstr#subtitles#linkstr##linkstr#youtube_url#linkstr##linkstr#ptp_poster#linkstr##linkstr#comparisons#linkstr##linkstr#version_info#linkstr##linkstr#multi_mediainfo#linkstr##linkstr#labels#linkstr#0",
     "auto_upload_screenshot": "True",
     "delete_screenshot": "True",
     "do_get_thumbnail": "True",
@@ -27,13 +27,14 @@
     "screenshot_storage_path": "temp/pic",
     "screenshot_threshold": "30.00",
     "second_confirm_file_name": "True",
-    "second_title_movie": "{original_title} / {other_titles} | \u7c7b\u578b\uff1a{categories} | \u6f14\u5458\uff1a{actors}",
-    "second_title_playlet": "{original_title} | {total_episodes} | {year}\u5e74 | {playlet_source} | \u7c7b\u578b\uff1a{categories}",
-    "second_title_tv": "{original_title} / {other_titles} | {total_episodes} | \u7c7b\u578b\uff1a{categories} | \u6f14\u5458\uff1a{actors}",
+    "second_title_movie": "{original_title} / {other_titles} | 类型：{categories} | 演员：{actors}",
+    "second_title_playlet": "{original_title} | {total_episodes} | {year}年 | {playlet_source} | 类型：{categories}",
+    "second_title_tv": "{original_title} / {other_titles} | {total_episodes} | 类型：{categories} | 演员：{actors}",
     "thumbnail_cols": "3",
     "thumbnail_delay": "2.0",
     "thumbnail_rows": "3",
     "torrent_storage_path": "temp/torrent",
-    "pt_gen_api_url_backup": "https://ptgen.agsvpt.work/",
-    "personalized_signature": ""
+    "pt_gen_api_url_backup": "https://pt-gen.hares.dpdns.org/api/getData",
+    "personalized_signature": "",
+    "auto_download_upload_poster": ""
 }

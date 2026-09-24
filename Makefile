@@ -1,6 +1,6 @@
 # Makefile for Publish Helper development
 
-.PHONY: help install install-dev test lint format clean run-gui run-api docker-build docker-run
+.PHONY: help install install-dev test lint format clean run-gui run-api docker-build docker-run docker-stop
 
 # Default target
 help:
@@ -65,15 +65,17 @@ run-api:
 run-cli:
 	python src/main_cli.py
 
-# Docker
+# Docker（统一镜像：Vue 前端 + Flask API + nginx 同容器）
+# context 必须是**两个仓库的公共父目录**（..），因为前端 publish-helper-vue
+# 是独立仓库、需在 node 阶段 COPY 其源码。故本目标先 cd .. 再构建。
 docker-build:
-	docker build -f deploy/Dockerfile -t publish-helper .
+	cd .. && docker build -f publish-helper/deploy/Dockerfile -t publish-helper:local .
 
 docker-run:
-	docker-compose -f deploy/docker-compose.yml up -d
+	docker compose -f deploy/docker-compose.yml up -d
 
 docker-stop:
-	docker-compose -f deploy/docker-compose.yml down
+	docker compose -f deploy/docker-compose.yml down
 
 # Package building
 build:

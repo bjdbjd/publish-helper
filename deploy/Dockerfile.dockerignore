@@ -1,0 +1,57 @@
+# 构建上下文是**两个仓库的公共父目录**（GitHub/），因此这里的路径都相对父目录。
+#
+# BuildKit 会优先使用 `<Dockerfile 路径>.dockerignore`（即本文件），
+# 而父目录下没有、也不该有 .dockerignore（那在仓库之外、不受版本控制）。
+#
+# 上下文本身很大（两个仓库 + 各自的 .venv/node_modules/media 合计 ~1.5G），
+# 不排除的话每次构建都要把上 GB 数据推给 docker daemon。
+
+# ---- 后端仓库 ----
+# 依赖与虚拟环境
+publish-helper/.venv/
+publish-helper/venv/
+publish-helper/__pycache__/
+publish-helper/**/__pycache__/
+publish-helper/**/*.py[cod]
+
+# 打包产物
+publish-helper/build/
+publish-helper/dist/
+publish-helper/release/
+publish-helper/*.spec
+
+# 用户数据（容器内由 volume 挂载 / 启动时创建）
+publish-helper/media/
+publish-helper/temp/
+publish-helper/logs/
+
+# 版本控制与 CI 元数据
+publish-helper/.git/
+publish-helper/.github/
+
+# 测试与缓存
+publish-helper/.pytest_cache/
+publish-helper/.mypy_cache/
+publish-helper/htmlcov/
+publish-helper/.coverage
+publish-helper/tests/
+
+# 本地密钥（不该进镜像层）
+publish-helper/.env
+
+# ---- 前端仓库 ----
+publish-helper-vue/node_modules/
+publish-helper-vue/dist/
+publish-helper-vue/.git/
+publish-helper-vue/coverage/
+publish-helper-vue/test-results/
+publish-helper-vue/playwright-report/
+publish-helper-vue/.eslintcache
+publish-helper-vue/.env
+publish-helper-vue/.env.*
+# 前端 e2e/单测不需要进镜像
+publish-helper-vue/e2e/
+
+# ---- 上下文里与本镜像无关的同级目录 ----
+auto_feed_js/
+human-eval-testbed/

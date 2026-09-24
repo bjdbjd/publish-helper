@@ -111,15 +111,36 @@ python src/main_cli.py
 
 ### Docker部署
 
-```bash
-# 使用docker-compose（配置在 deploy/）
-docker-compose -f deploy/docker-compose.yml up -d
+统一镜像**内含 Vue 前端 + Flask API + nginx**（同一个容器），前端由镜像自行构建，
+无需预先打包。镜像已发布到 GHCR：
 
-# 或直接构建
-docker build -f deploy/Dockerfile -t publish-helper .
-# 映射 API 端口 15372 与 前端 Nginx 端口 15373
-docker run -p 15372:15372 -p 15373:15373 publish-helper
+```bash
+# 拉取官方镜像启动（推荐，无需源码）
+docker run -d --name publish-helper \
+  -p 15373:15373 \
+  -v ./volume/static:/app/static \
+  -v ./volume/media:/app/media \
+  ghcr.io/bjdbjd/publish-helper:latest
+# 访问 http://localhost:15373
 ```
+
+用 compose（`docs/publish-helper.yml` 为拉取式，`deploy/docker-compose.yml` 为本地构建式）：
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d
+```
+
+从源码构建统一镜像时，**context 必须是两个仓库的公共父目录**（前端是独立仓库
+[publish-helper-vue](https://github.com/bjdbjd/publish-helper-vue)，与后端同级）：
+
+```bash
+cd ..   # 进入同时包含 publish-helper/ 与 publish-helper-vue/ 的目录
+docker build -f publish-helper/deploy/Dockerfile -t publish-helper:local .
+# 或在后端目录直接 make docker-build（会自动切到父目录）
+```
+
+> 只需暴露 **15373**（nginx，同时提供界面与 `/api` 反代）；15372 是容器内的 Flask，
+> 默认不对外暴露。旧文档里的 `docker build -f deploy/Dockerfile .` 已不再适用。
 
 ## ⚙️ 配置说明
 

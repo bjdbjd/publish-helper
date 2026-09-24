@@ -70,9 +70,20 @@ When adding code inside a module under `src/`, follow the `from src.…` convent
 - Cross-platform support binaries live under **`libs/`**: `libs/deb/` (Docker Debian debs + entrypoint/nginx), `libs/macos/libmediainfo.0.dylib`, `libs/pinyin/Mandarin.dat`. The Dockerfile and `main_gui.py`'s PyInstaller docstring reference these paths.
 - Working dirs `temp/`, `media/`, `logs/` are created on startup.
 
+### Docker（统一镜像）
+
+- **一个镜像同时装 Vue 前端 + Flask API + nginx**，由 `deploy/Dockerfile` 多阶段构建：`node:22-bookworm-slim` 阶段构建前端（用 `npm run build:docker`，只跑 vite build 不跑类型检查），`python:3.11-slim-bookworm` 阶段跑服务。前端产物落到 `/public`，nginx（`libs/deb/nginx.conf`）提供界面并同源反代 `/api` 到 Flask。
+- **build context 必须是两个仓库的公共父目录**（即 `GitHub/`），因为前端 `publish-helper-vue` 是**独立仓库**、与后端同级，Dockerfile 里用 `publish-helper/…` 与 `publish-helper-vue/…` 两个相对路径 COPY。因此 `docker build -f deploy/Dockerfile .`（在后端根目录）**不再可用**；用 `make docker-build`（会自动 `cd ..`）或 `docker compose -f deploy/docker-compose.yml up`。
+- `.dockerignore` 用 **`deploy/Dockerfile.dockerignore`**（BuildKit 按 `<Dockerfile>.dockerignore` 匹配）。父目录下没有也不该有 `.dockerignore`（那在仓库之外、不受版本控制）。旧的仓库根 `.dockerignore` 已删除。
+- **只暴露 15373**（nginx）；15372 是容器内的 Flask。容器 healthcheck 用 `curl`（slim 基础镜像不自带，Dockerfile 已显式安装）。
+- **MediaInfo 用 `libs/deb/` 里随仓库携带的 .deb 本地安装**，不用 apt 装 Debian 源版本。这些 .deb 是 **Debian 12 (bookworm)** 构建、要求 glibc ≥ 2.34，故基础镜像必须是 bookworm。**不要**改回 bullseye 或引入 `libs/deb/sources.list`（那是 buster 源）——那正是旧 Dockerfile 的三方版本错配（buster 源 + bullseye 镜像 + bookworm deb）。
+- `deploy/requirements_api.txt` 是**镜像专用的生产依赖表**（无 PyQt6）。历史上漏了 `python-dotenv`，而 `src/config/settings.py` 无条件 `from dotenv import load_dotenv`（Flask 仅在自己 `dotenv` extra 里声明它）——缺它容器启动即 `ModuleNotFoundError`，已补。**改动该文件后务必确认 settings.py 的导入仍被覆盖。**
+- `libs/deb/entrypoint` 做三件事：按缺失把 `/opt/static-default` 的静态数据文件补种到挂载出来的 `/app/static`（语义同打包版的 copy-if-absent，不覆盖用户配置）、`envsubst` 渲染 nginx 模板并 `nginx -t` 校验、最后 `exec python src/main_api.py`（`exec` 是必须的，否则 PID 1 是 shell、`docker stop` 的 SIGTERM 传不到 Flask）。
+- CI：`.github/workflows/docker.yml` 在推 `v*` tag 时构建并推送 `ghcr.io/bjdbjd/publish-helper`（同时打版本号与 `latest`）；该工作流 checkout **两个仓库**到同级目录再以父目录为 context 构建。`release.yml` 则仍是 PyInstaller 三平台桌面产物，两者互不依赖。
+
 ## Gotchas
 
-- **Version is kept in three places and they are now kept in sync**: `pyproject.toml` `version`, `src/config/__init__.py` `__version__`, and the `GUI_VERSION` env default in `src/config/settings.py` — all three are `2.0.0` as of the v2.0.0 release (they were previously out of sync at `2.0.0` / `1.4.5` / `1.4.5`). When bumping, update all three.
+- **Version is kept in three places and they are now kept in sync**: `pyproject.toml` `version`, `src/config/__init__.py` `__version__`, and the `GUI_VERSION` env default in `src/config/settings.py` — all three are `2.0.2` as of the latest release (they were previously out of sync at `2.0.0` / `1.4.5` / `1.4.5`). When bumping, update all three.
 - **Packaging uses a writable-vs-bundle split** (`src/config/settings.py`): `BASE_DIR` is the writable data root — `Path(sys.executable).parent` when frozen, project root otherwise — while `BUNDLE_DIR` is the read-only `sys._MEIPASS` holding the bundled `static/`. Do NOT reintroduce `Path(__file__).parent.parent.parent` as `BASE_DIR`: under PyInstaller onefile that points into the per-run temp extraction dir, so user settings, `media/` and `logs/` would silently reset on every launch. Seeded bundled files are copy-if-absent, so upgrades never clobber an existing `static/settings.json`.
 - `docs/DEVELOPMENT.md` describes a test matrix (`test_core.py`, `test_api.py`, `test_gui.py`) that does not exist — only `tests/test_config.py`, `tests/test_utils.py`, `tests/test_settings_tool.py`, `tests/test_file_utils_json.py` and `tests/test_api_getfile.py` are present.
 - Commit messages use a Chinese `[type]:[scope][detail]` conventional style (e.g. `[feat]:[][支持了自动检测季数信息，如果不一致会自动提醒]`), not English — keep commits in this style.

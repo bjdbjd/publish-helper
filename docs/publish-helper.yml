@@ -1,26 +1,44 @@
-version: '3.2'
+# 用户侧部署配置（拉取官方镜像启动）
+#
+# 用法：
+#   mkdir -p volume/{static,media,temp,logs}
+#   docker compose -f publish-helper.yml up -d
+# 然后访问 http://<主机>:15373
+#
+# 与 deploy/docker-compose.yml 的区别：这份只**拉取**已发布的镜像，
+# 不构建（适合没有两个仓库源码的用户）；deploy/ 那份用于本地构建。
 
 services:
   publish-helper:
-    image: sertion1126/publish-helper:2.0.0
+    image: ghcr.io/bjdbjd/publish-helper:${IMAGE_TAG:-latest}
     hostname: publish-helper
     container_name: publish-helper
-    restart: always
+    restart: unless-stopped
     networks:
       - publish-helper-network
     environment:
       - API_PORT=15372
       - NGINX_PORT=15373
+      - LOG_LEVEL=INFO
+      # 后端 API 鉴权（可选，留空即关闭）
+      - API_AUTH_TOKEN=${API_AUTH_TOKEN:-}
     volumes:
-      # 项目配置目录
+      # 配置目录：首次启动会自动补种静态数据文件与默认 settings.json
       - ./volume/static:/app/static
-      # 运行临时目录
+      # 运行临时目录（截图/缩略图/种子）
       - ./volume/temp:/app/temp
-      # 资源路径
+      # 资源目录：待发布的视频放在这里
       - ./volume/media:/app/media
+      - ./volume/logs:/app/logs
     ports:
-      - "15372:15372"
+      # 只需暴露 nginx 端口：它同时提供界面与 /api 反代
       - "15373:15373"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:15372/api/settings"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
 
 networks:
   publish-helper-network:

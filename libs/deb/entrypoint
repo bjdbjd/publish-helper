@@ -1,9 +1,40 @@
 #!/bin/bash
+set -e
 
-# 使用 `envsubst` 将模板文件中的 ${NGINX_PORT} 替换为实际的环境变量值
+# 把镜像内自带的静态资源补进 /app/static（只补缺失的，绝不覆盖已存在的）。
+#
+# 为什么需要：compose 把宿主 ./volume/static 挂到 /app/static，会**遮住**镜像里
+# 自带的 static/。而 abbreviation.json（命名缩写表）、combo-box-data.json（下拉数据）、
+# picture-bed-data.json（图床识别）、ph-bjd.ico（图标）是运行必需的数据文件；
+# settings.json 则应由用户持有，程序（SettingsManager）在缺失时会自行生成默认值。
+#
+# 语义与打包版一致：copy-if-absent，升级不会覆盖用户改过的配置。
+if [ -d /opt/static-default ]; then
+    mkdir -p /app/static
+    for f in /opt/static-default/*; do
+        [ -e "$f" ] || continue
+        name=$(basename "$f")
+        if [ ! -e "/app/static/$name" ]; then
+            cp -r "$f" "/app/static/$name"
+            echo "已播种静态资源：$name"
+        fi
+    done
+fi
+
+# 用 envsubst 把模板里的 ${NGINX_PORT}/${API_PORT} 替换成实际环境变量值。
+# 单引号里的参数是**白名单**：只有这两个会被替换，模板中 $uri/$http_upgrade 等
+# nginx 运行时变量保持字面量，交由 nginx 自己插值。
 envsubst '${NGINX_PORT}${API_PORT}' < /etc/nginx/nginx.template.conf > /etc/nginx/nginx.conf
-# 启动前端nginx服务
-nginx
-# 启动后端 API 服务（src/main.py 已不存在，使用 main_api.py）
-export PYTHONPATH=${PYTHONPATH}:. && python src/main_api.py
 
+# 先校验配置：配置写坏时立刻失败退出，而不是起一个「API 能用但界面 404」的容器
+nginx -t
+
+# 启动前端 nginx（后台常驻）
+nginx
+
+# 启动后端 API 服务。
+# 用 exec 让 python 顶替 shell 成为 PID 1 —— 否则 docker stop 的 SIGTERM 只发给
+# 最外层的 sh，Flask 收不到，只能等 10s 后被 SIGKILL 强杀。
+# PYTHONPATH 已在镜像里设好（/app），此处无需再 export。
+echo "Starting Publish Helper API on port ${API_PORT} ..."
+exec python src/main_api.py

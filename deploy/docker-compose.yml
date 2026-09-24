@@ -1,41 +1,51 @@
-version: '3.8'
+# Publish Helper 统一镜像（Vue 前端 + Flask API + nginx 同容器）。
+#
+# 用法（在本目录下执行）：
+#   docker compose up -d
+# 或从仓库根目录：
+#   docker compose -f deploy/docker-compose.yml up -d
+#
+# 注意 build.context 是**两个仓库的公共父目录**（../..），因为前端是独立仓库、
+# 需要在 node 阶段 COPY 它的源码。因此本文件要求 publish-helper 与
+# publish-helper-vue 是同级目录（默认布局即如此）。
+#
+# 访问入口是 **15373**（nginx，同时提供界面与 /api 反代）。
+# 15372（Flask）仅供容器内使用，默认不对宿主暴露。
 
 services:
   publish-helper:
     build:
-      context: ..
-      dockerfile: Dockerfile
+      # 父目录：同时包含 publish-helper/ 与 publish-helper-vue/
+      context: ../..
+      dockerfile: publish-helper/deploy/Dockerfile
+      args:
+        # 后端若启用鉴权（API_AUTH_TOKEN），这里要填相同 token。
+        # 注意该值会被内联进前端产物，仅在**构建时**生效。
+        VITE_API_AUTH_TOKEN: ${VITE_API_AUTH_TOKEN:-}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+    image: ghcr.io/bjdbjd/publish-helper:${IMAGE_TAG:-latest}
+    container_name: publish-helper
     ports:
-      - "15372:15372" # API port
-      - "15373:15373" # Nginx port
+      - "15373:15373" # nginx：界面 + /api 反代（唯一需要暴露的端口）
     volumes:
-      - ../static:/app/static
-      - ../media:/app/media
-      - ../temp:/app/temp
-      - ../logs:/app/logs
+      # 用户配置与数据持久化（首次启动由 entrypoint 按缺失补种静态数据文件）。
+      # 挂载会遮住镜像自带的 static/，所以默认配置靠补种、用户改动留在宿主目录。
+      - ./volume/static:/app/static
+      - ./volume/media:/app/media
+      - ./volume/temp:/app/temp
+      - ./volume/logs:/app/logs
     environment:
       - API_PORT=15372
       - NGINX_PORT=15373
       - LOG_LEVEL=INFO
       - ENVIRONMENT=production
+      # 后端 API 鉴权（可选，留空即关闭，向后兼容）
+      - API_AUTH_TOKEN=${API_AUTH_TOKEN:-}
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:15372/api/settings" ]
+      # curl 已在镜像中安装（slim 基础镜像不自带，Dockerfile 里显式装了）
+      test: ["CMD", "curl", "-fsS", "http://localhost:15372/api/settings"]
       interval: 30s
       timeout: 10s
+      start_period: 40s
       retries: 3
-
-  # Optional: Add a reverse proxy for production
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ../nginx.conf:/etc/nginx/nginx.conf
-      - ../ssl:/etc/nginx/ssl
-    depends_on:
-      - publish-helper
-    restart: unless-stopped
-    profiles:
-      - production
